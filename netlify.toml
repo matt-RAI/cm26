@@ -1,0 +1,6 @@
+# Configuration Netlify pour le site CM26
+# - publish = "." : le site est un simple index.html à la racine
+# - functions : dossier où Netlify va chercher les fonctions serveur
+[build]
+  publish = "."
+  functions = "netlify/functions"
