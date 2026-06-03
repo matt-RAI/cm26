@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>CM26 — Le Mondial des potes 🦅</title>
+<title>CM26 — Le QG du Mondial 🦅</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -602,7 +602,7 @@ footer b{color:var(--muted)}
       <span class="hdot">·</span>
       <span class="hcountry">🇨🇦 Canada <span class="hemo">🍁</span> <span class="hemo">🦫</span></span>
     </div>
-    <div class="hostsub"><b>CM26</b> 🦅 — bricolé entre potes · Diffusion FR : M6 (clair) + beIN Sports</div>
+    <div class="hostsub"><b>CM26</b> 🦅 — un projet entre amis · Diffusion FR : M6 (clair) + beIN Sports</div>
   </footer>
 </div>
 
@@ -771,11 +771,11 @@ const G_ICON=`<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.7
 function drawLogin(){
   authModal.innerHTML=`
     <button class="close" onclick="closeLogin()">✕</button>
-    <h3>Rejoins tes potes 🍻</h3>
-    <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
+    <h3>Rejoins tes amis ⚽</h3>
+    <p class="msub">Connecte-toi pour participer au concours de pronostics et synchroniser ta watchlist. La navigation reste libre.</p>
     <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
 }
-function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;lbCache=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À plus 👋")}
+function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;lbCache=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À bientôt 👋")}
 
 /* ============================================================
    CONNEXION GOOGLE via SUPABASE
@@ -799,7 +799,7 @@ function applySupabaseSession(session){
     const u=session.user, meta=u.user_metadata||{};
     state.user={
       id: u.id,
-      name: meta.full_name || meta.name || (u.email? u.email.split("@")[0] : "Un pote"),
+      name: meta.full_name || meta.name || (u.email? u.email.split("@")[0] : "Invité"),
       provider: (u.app_metadata && u.app_metadata.provider) || "google",
       email: u.email || "",
       avatar: meta.avatar_url || meta.picture || ""
@@ -908,7 +908,7 @@ function drawOnboarding(){
       <h3>Bienvenue 👋</h3>
       <p class="msub">Choisis ton pseudo pour le concours de pronos. (20 caractères max)</p>
       <div class="field"><label>Ton pseudo</label>
-        <input id="onbPseudo" maxlength="20" placeholder="Momo, Greg, La Pioche…" value="${(state.user&&state.user.name?state.user.name.split(" ")[0]:"").slice(0,20)}"></div>
+        <input id="onbPseudo" maxlength="20" placeholder="ex. Antoine, Julie…" value="${(state.user&&state.user.name?state.user.name.split(" ")[0]:"").slice(0,20)}"></div>
       <button class="savebtn" onclick="submitPseudo()">Continuer →</button>`;
     setTimeout(()=>{const el=document.getElementById("onbPseudo");if(el){el.focus();el.select()}},50);
   }else if(onbStep==="orga"){
@@ -1055,7 +1055,7 @@ function renderWatchlist(){
   let html=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
     <div class="kick">★ Ma sélection ★</div>
     <h2 style="font-size:28px">Ma watchlist</h2>
-    <p>Les matchs que tu ne lâches pas. Tout balancer dans l'agenda d'un coup, et inviter la clique.</p>`;
+    <p>Les matchs que tu suis de près. Ajoute-les à ton agenda en une fois et invite tes amis.</p>`;
   if(list.length){
     html+=`<div style="margin-top:18px"><button class="calbtn full" style="max-width:260px" onclick="exportAll()">
       📅 Tout exporter (.ics) — ${list.length} match${list.length>1?'s':''}</button></div>`;
@@ -1104,7 +1104,7 @@ function drawCal(){
   document.getElementById("calModal").innerHTML=`
     <button class="close" onclick="closeCal()">✕</button>
     <h3>Dans mon agenda</h3>
-    <p class="msub">Compatible Gmail, Outlook & Apple. Invite les potes par email.</p>
+    <p class="msub">Compatible Gmail, Outlook & Apple. Invite tes amis par e-mail.</p>
     <div class="matchprev">
       <span class="mp-t">${home.flag} ${home.name}</span>
       <span class="vs">${fmtParis(m.utcDate)}</span>
@@ -1116,14 +1116,14 @@ function drawCal(){
     </div>
     <div class="discreet-name ${calCtx.discreet?'on':''}">📌 Titre de l'event : « ${calCtx.dn} » <button onclick="event.stopPropagation();rerollDiscreet()" style="margin-left:auto;background:none;border:none;color:var(--gold);cursor:pointer;font-family:'DM Mono'">↻</button></div>
     <div class="field">
-      <label>Inviter des potes (emails séparés par des virgules)</label>
+      <label>Inviter des amis (e-mails séparés par des virgules)</label>
       <input id="guests" inputmode="email" autocapitalize="off" placeholder="momo@boite.com, greg@autreboite.fr">
       <div class="hint">Ils reçoivent une vraie invitation calendrier — discrète si le mode est activé.</div>
     </div>
     <div class="calbtns">
       <a class="calbtn" id="gcalBtn" target="_blank" rel="noopener">📆 Google Agenda</a>
       <button class="calbtn" onclick="downloadICS(false)">⬇️ Fichier .ics</button>
-      <button class="calbtn full" onclick="downloadICS(true)">✉️ Inviter les potes + télécharger</button>
+      <button class="calbtn full" onclick="downloadICS(true)">✉️ Inviter mes amis + télécharger</button>
     </div>`;
   refreshGcalLink();
 }
@@ -1183,7 +1183,7 @@ function downloadICS(withGuests){
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download=(calCtx.id==="ALL"?"ma-watchlist-mondial26":"match-mondial26")+".ics";a.click();
   closeCal();
-  toast(guests.length?`Invitation prête pour ${guests.length} pote${guests.length>1?'s':''} ✉️`:"Ajouté à ton agenda 📅");
+  toast(guests.length?`Invitation prête pour ${guests.length} ami${guests.length>1?'s':''} ✉️`:"Ajouté à ton agenda 📅");
 }
 function exportAll(){calCtx={id:"ALL",discreet:false,dn:DISCREET[0]};
   document.getElementById("calOverlay").classList.add("on");
@@ -1195,7 +1195,7 @@ function exportAll(){calCtx={id:"ALL",discreet:false,dn:DISCREET[0]};
       <div class="tl"><b>🕵️ Mode discret</b><span>Tous les events prennent des titres "pro"</span></div>
       <div class="sw"></div>
     </div>
-    <div class="field"><label>Inviter des potes (emails)</label>
+    <div class="field"><label>Inviter des amis (e-mails)</label>
       <input id="guests" inputmode="email" autocapitalize="off" placeholder="momo@boite.com, greg@autreboite.fr"></div>
     <div class="calbtns"><button class="calbtn full" onclick="downloadICS(true)">⬇️ Tout télécharger (.ics)</button></div>`;
   // pour le mode discret sur l'export groupé, on tire un titre par event au build
@@ -1392,7 +1392,7 @@ function lbRows(allowedIds){
 
 function renderClassement(){
   const hero=`<div class="hero" style="padding:24px 26px">
-    <div class="kick">Le concours entre potes 🦅</div>
+    <div class="kick">Le concours entre amis 🦅</div>
     <h2 style="font-size:28px">Classement 🏆</h2>
     <p>Score exact <b style="color:var(--red)">3 pts</b>, bon résultat <b style="color:var(--blue)">1 pt</b>. Bonus tournoi : champion <b>15</b>, meilleur buteur <b>10</b>, meilleur joueur <b>10</b>.</p>
   </div>`;
@@ -1735,7 +1735,7 @@ function heroWelcomeHTML(){
   return `<div class="hero hero-welcome">
     <button class="hero-x" onclick="dismissHero()" title="J'ai compris">✕</button>
     <div class="kick">Bienvenue 🇺🇸 🇲🇽 🇨🇦</div>
-    <h2 style="font-size:clamp(30px,5vw,46px)">Ton QG du Mondial 🦅</h2>
+    <h2 style="font-size:clamp(30px,5vw,46px)">Le QG du Mondial 🦅</h2>
     <p>Suis tous les matchs, pronostique les scores, ajoute-les à ton agenda et compare-toi à tes amis.</p>
     <div class="herofeats">
       <div class="hf"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">Les 104 matchs, à l'heure de Paris, avec la chaîne TV</span></div>
@@ -1754,8 +1754,8 @@ function renderPronos(){
     view.innerHTML=hero+tournamentSectionHTML()+`
       <div class="gate">
         <div class="lock">🔒</div>
-        <h3>Connecte-toi pour jouer</h3>
-        <p>Le concours, c'est nominatif : on enregistre tes pronos et on te place au classement. Le reste du site reste libre d'accès.</p>
+        <h3>Connecte-toi pour participer</h3>
+        <p>Le concours est nominatif : tes pronostics sont enregistrés et tu apparais au classement. La navigation reste libre.</p>
         <button class="authbtn" style="padding:11px 22px;font-size:14px" onclick="openLogin()">Se connecter</button>
       </div>`;
     return;
