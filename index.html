@@ -183,6 +183,11 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
   color:var(--gold);background:linear-gradient(180deg,rgba(236,184,74,.16),rgba(236,184,74,.04));
   border-right:1px solid rgba(236,184,74,.35)}
 .ledscroll{flex:1;overflow:hidden;position:relative}
+.ledpaid{flex:none;display:flex;align-items:center;text-align:center;padding:0 14px;max-width:160px;
+  font-family:'DM Mono';font-size:10px;font-weight:500;line-height:1.35;letter-spacing:.4px;color:var(--muted);
+  background:linear-gradient(180deg,rgba(47,107,255,.12),rgba(47,107,255,.03));
+  border-left:1px solid var(--line-2)}
+@media(max-width:600px){.ledpaid{display:none}}
 .ledtrack{display:flex;align-items:center;width:max-content;padding:10px 0;margin-left:24px;
   animation:ledscrollanim 75s linear infinite}
 @keyframes ledscrollanim{from{transform:translateX(0)}to{transform:translateX(-50%)}}
@@ -1826,6 +1831,7 @@ function sponsorBannerHTML(){
   return `<div class="ledbanner" aria-label="Partenaires officiels">
     <div class="ledlabel">★ Partenaires<br>officiels ★</div>
     <div class="ledscroll"><div class="ledtrack">${seq}${seq}</div></div>
+    <div class="ledpaid">Partenariat rémunéré<br>en boîtes de Pringles 🟢</div>
   </div>`;
 }
 
