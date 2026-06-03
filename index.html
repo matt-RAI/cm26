@@ -437,8 +437,27 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes pop{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
 
-footer{text-align:center;color:var(--muted-2);font-size:12px;margin-top:50px;padding-top:24px;border-top:1px solid var(--line)}
+footer{text-align:center;color:var(--muted-2);font-size:12px;margin-top:50px;padding-top:22px;border-top:1px solid var(--line)}
 footer b{color:var(--muted)}
+/* bande "chemise de bûcheron" (tartan rouge/noir) — clin d'œil Canada */
+.plaid{height:7px;border-radius:4px;margin:0 auto 16px;max-width:240px;opacity:.85;
+  background-color:#b3202c;
+  background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.45) 0 7px,transparent 7px 14px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.45) 0 7px,transparent 7px 14px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 2px,transparent 2px 14px)}
+.hostband{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;align-items:center;
+  font-family:'Archivo';font-weight:700;font-size:13px;color:var(--muted)}
+.hostband .hcountry{display:inline-flex;align-items:center;gap:5px}
+.hostband .hdot{color:var(--line-2)}
+.hostband .hstar{color:#ffce3a}
+.hostband .hemo{font-size:15px;line-height:1}
+.hostband .hicon{height:17px;width:auto;display:inline-block;vertical-align:middle;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));transition:transform .15s}
+.hostband .hcountry:hover .hicon{transform:translateY(-2px) rotate(-4deg)}
+.hostsub{margin-top:12px;font-size:12px;color:var(--muted-2)}
+.hostbtn{font-size:17px}
+.hostbtn:hover{border-color:var(--red);transform:translateY(-2px) rotate(9deg)}
+@media(max-width:430px){.hostbtn{display:none}}
 
 /* ============ RESPONSIVE / MOBILE-FIRST ============ */
 @media(max-width:900px){ .wrap{padding:0 16px 110px} }
@@ -522,7 +541,7 @@ footer b{color:var(--muted)}
 <div class="wrap">
   <header>
     <div class="bar">
-      <div class="brand" onclick="go('matchs')">
+      <div class="brand" onclick="go('pronos')">
         <div class="crest">26</div>
         <div>
           <h1>CM<span>26</span></h1>
@@ -531,7 +550,9 @@ footer b{color:var(--muted)}
       </div>
       <div class="headright">
         <div class="countdown"><span class="live-dot"></span> Kickoff dans <b id="cd">—</b></div>
-        <button class="eaglebtn" onclick="usaChant()" title="U-S-A!">🦅</button>
+        <button class="eaglebtn" onclick="usaChant()" title="U-S-A! 🦅">🦅</button>
+        <button class="eaglebtn hostbtn" onclick="mexFiesta()" title="¡Fiesta! 🌶️">🌶️</button>
+        <button class="eaglebtn hostbtn" onclick="canadaCheer()" title="Oh Canada! 🍁">🍁</button>
         <div id="authSlot"></div>
       </div>
     </div>
@@ -553,7 +574,19 @@ footer b{color:var(--muted)}
   <main id="view"></main>
 
   <footer>
-    <b>CM26</b> 🦅 — bricolé entre potes 🌭 · Données indicatives, à brancher sur l'API officielle FIFA · Diffusion FR : M6 (clair) + beIN Sports
+    <div class="plaid" aria-hidden="true"></div>
+    <div class="hostband">
+      <span class="hcountry">🇺🇸 USA <span class="hstar">★</span></span>
+      <span class="hdot">·</span>
+      <span class="hcountry">🇲🇽 México
+        <svg class="hicon" viewBox="0 0 32 24" aria-hidden="true"><ellipse cx="16" cy="18" rx="15" ry="4.4" fill="#caa14a"/><ellipse cx="16" cy="18" rx="15" ry="4.4" fill="none" stroke="#8c6418" stroke-width="1"/><path d="M9 18C9 9 11 4 16 4s7 5 7 14Z" fill="#e0bd63"/><path d="M9.6 15.4Q16 12.8 22.4 15.4" stroke="#8c6418" stroke-width="1.3" fill="none"/><ellipse cx="16" cy="4.3" rx="2.3" ry="1.1" fill="#caa14a"/></svg>
+        <svg class="hicon" viewBox="0 0 32 24" aria-hidden="true"><path d="M16 9c2 4 5 5 7.5 4s3.7-3.4 4-7c.3 4.4-1 9-5 9.4-2.8.3-5-1.4-6.5-4-1.5 2.6-3.7 4.3-6.5 4-4-.4-5.3-5-5-9.4.3 3.6 1.5 6 4 7s5.5 0 7.5-4Z" fill="#241712"/></svg>
+        <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5c1.5 3 1 6-1.2 8.6C4.2 16.7 6 21 10 21c5 0 9-4.5 9-9.5 0-2.5-1.2-4.3-3-5.3" fill="none" stroke="#d8202f" stroke-width="3.4" stroke-linecap="round"/><path d="M8 5c-.8-1.4-.4-2.6 1-3 -.4 1.2.4 2 1.6 2.2" fill="none" stroke="#2e9e3a" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </span>
+      <span class="hdot">·</span>
+      <span class="hcountry">🇨🇦 Canada <span class="hemo">🍁</span> <span class="hemo">🦫</span></span>
+    </div>
+    <div class="hostsub"><b>CM26</b> 🦅 — bricolé entre potes · Diffusion FR : M6 (clair) + beIN Sports</div>
   </footer>
 </div>
 
@@ -1811,6 +1844,24 @@ function usaChant(){
     setTimeout(()=>s.remove(),1600);
   }
 }
+
+// Pluie d'emojis générique (clin d'œil aux pays hôtes) — même mécanique que la pluie d'étoiles.
+function emojiBurst(items){
+  const cx=window.innerWidth-110, cy=70;
+  for(let i=0;i<16;i++){
+    const s=document.createElement("span");s.className="star-pop";
+    s.textContent=items[i%items.length];
+    s.style.left=(cx+(Math.random()*170-85))+"px";
+    s.style.top=(cy+(Math.random()*30-15))+"px";
+    s.style.fontSize=(16+Math.random()*16)+"px";
+    s.style.animation="starPop "+(0.9+Math.random()*0.6)+"s ease-out forwards";
+    s.style.animationDelay=(Math.random()*0.2)+"s";
+    document.body.appendChild(s);
+    setTimeout(()=>s.remove(),1700);
+  }
+}
+function mexFiesta(){toast("¡Arriba, arriba! 🌶️🎉");emojiBurst(["🌶️","🌮","🪅","🎉","🇲🇽","🌵"])}
+function canadaCheer(){toast("Oh Canada! 🍁🦫");emojiBurst(["🍁","🦫","🏒","🇨🇦","🍁"])}
 
 /* countdown */
 function tickCD(){
