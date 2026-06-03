@@ -863,7 +863,25 @@ async function loadUserData(userId){
   state.profile=prof; store.set("cm26_profile",prof);
   await loadOrgas(userId);
   await loadTournamentPredictions(userId);
+  await loadMatchPredictions(userId);
   renderAuth();render();
+}
+
+// Charge les pronos de match de l'utilisateur (Supabase = source de vérité).
+async function loadMatchPredictions(userId){
+  const {data,error}=await supabase
+    .from("match_predictions").select("match_id,pred_home,pred_away").eq("user_id",userId);
+  if(error){toast("Erreur chargement des pronos de match : "+error.message);return}
+  // On part du cache local puis Supabase écrase en cas de conflit.
+  const merged={...state.pronos};
+  (data||[]).forEach(r=>{
+    const o={};
+    if(r.pred_home!=null)o.a=r.pred_home;
+    if(r.pred_away!=null)o.b=r.pred_away;
+    if(Object.keys(o).length)merged[r.match_id]=o; else delete merged[r.match_id];
+  });
+  state.pronos=merged;
+  save(); // met à jour le cache localStorage
 }
 
 // Charge les pronos de tournoi (vainqueur, buteur, joueur) de l'utilisateur.
@@ -1577,12 +1595,14 @@ function renderPronos(){
 
   let rows=upcoming.map(m=>{
     const p=state.pronos[m.id]||{};
+    const locked=matchLocked(m);
+    const dis=locked?"disabled":"";
     return `<div class="prono">
       <div class="pside">${flagHTML(m.a)}<span class="nm">${nm(m.a)}</span></div>
       <div class="scorebox">
-        <input type="number" inputmode="numeric" min="0" max="20" value="${p.a??''}" placeholder="–" onchange="setProno('${m.id}','a',this.value)">
-        <span>–</span>
-        <input type="number" inputmode="numeric" min="0" max="20" value="${p.b??''}" placeholder="–" onchange="setProno('${m.id}','b',this.value)">
+        <input type="number" inputmode="numeric" min="0" max="20" value="${p.a??''}" placeholder="–" ${dis} onchange="setProno('${m.id}','a',this.value)">
+        <span title="${locked?'Match commencé — prono verrouillé':''}">${locked?'🔒':'–'}</span>
+        <input type="number" inputmode="numeric" min="0" max="20" value="${p.b??''}" placeholder="–" ${dis} onchange="setProno('${m.id}','b',this.value)">
       </div>
       <div class="pside r">${flagHTML(m.b)}<span class="nm">${nm(m.b)}</span></div>
     </div>`;
@@ -1592,12 +1612,41 @@ function renderPronos(){
   <div class="split">
     <div class="panel">
       <h3>Tes pronostics</h3>
-      <p class="sub">${done}/${upcoming.length} matchs pronostiqués · enregistrés automatiquement</p>
+      <p class="sub">${done}/${upcoming.length} matchs pronostiqués · 🔒 = match commencé</p>
       ${rows}
-      <button class="savebtn ${done?'saved':''}" onclick="toast('Pronos enregistrés ✓')">${done?'✓ Pronos enregistrés':'Valider mes pronos'}</button>
+      <button class="savebtn" onclick="saveMatchPronos()">💾 Enregistrer mes pronos de match</button>
     </div>
     <div>${leaderboard}</div>
   </div>`;
+}
+
+// Coup d'envoi d'un match (date+heure du code) ; garde-fou sur KICKOFF global.
+function matchKickoff(m){
+  if(m&&m.day&&m.time){
+    const d=new Date(`${m.day}T${m.time}:00`);
+    if(!isNaN(d.getTime()))return d;
+  }
+  return KICKOFF;
+}
+function matchLocked(m){return new Date()>=matchKickoff(m)}
+
+// Enregistre tous les pronos de match dans Supabase (upsert user_id + match_id).
+async function saveMatchPronos(){
+  if(!state.user){toast("Connecte-toi pour enregistrer tes pronos");return}
+  const now=new Date().toISOString();
+  const rows=[];
+  Object.keys(state.pronos).forEach(mid=>{
+    const m=MATCHES.find(x=>x.id===mid);
+    if(m && matchLocked(m))return;            // on ne pousse pas un match déjà commencé
+    const p=state.pronos[mid]||{};
+    if(p.a==null && p.b==null)return;
+    rows.push({user_id:state.user.id,match_id:mid,pred_home:p.a??null,pred_away:p.b??null,updated_at:now});
+  });
+  if(!rows.length){toast("Aucun prono à enregistrer");return}
+  const {error}=await supabase.from("match_predictions").upsert(rows,{onConflict:"user_id,match_id"});
+  if(error){toast("Enregistrement impossible : "+error.message);return}
+  lbCache=null; // le classement devra se recalculer
+  toast("Pronos de match enregistrés ✓");
 }
 function setProno(id,side,val){
   state.pronos[id]=state.pronos[id]||{};
