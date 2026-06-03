@@ -332,6 +332,8 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .pstat.ok{color:var(--grass);font-weight:600}
 .pstat.err{color:var(--red)}
 .mdh{font-family:'Archivo';font-weight:700;font-size:14px;margin:18px 0 6px;color:var(--muted)}
+.pfilters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px}
+.pfilters .field{margin-bottom:0;flex:1;min-width:140px}
 .savebtn{margin-top:16px;width:100%;background:var(--grass);color:#fff;border:none;border-radius:11px;
   font-family:'Archivo';font-weight:700;font-size:14px;padding:12px;cursor:pointer;transition:.16s}
 .savebtn:hover{background:#ff4659;transform:translateY(-1px)}
@@ -1590,7 +1592,42 @@ function finalRow(m){
   </div>`;
 }
 
-// Construit toute la liste des matchs (poules par journée + phase finale à part).
+/* ---- Filtres des pronos de match (journée / heure / équipe) ---- */
+let pronoFilter={jour:"all", heure:"all", team:""};
+function setPronoFilter(k,v){
+  pronoFilter[k]=v;
+  render();
+  if(k==="team"){const el=document.getElementById("pronoTeam");if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+}
+function resetPronoFilter(){pronoFilter={jour:"all",heure:"all",team:""};render()}
+// normalise (minuscules + sans accents) pour une recherche tolérante
+function norm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")}
+// heure de Paris "HH:MM" d'un match
+function parisHour(m){try{return new Date(m.utcDate).toLocaleTimeString("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"})}catch(e){return""}}
+// liste d'autocomplétion (noms FR des équipes présentes)
+function teamDatalist(){
+  const seen=new Set();let opts="";
+  (apiMatches||[]).forEach(m=>[m.homeTeam,m.awayTeam].forEach(t=>{
+    if(t&&t.name){const fr=teamFrName(t);if(!seen.has(fr)){seen.add(fr);opts+=`<option value="${escAttr(fr)}">`}}
+  }));
+  return `<datalist id="teamlist">${opts}</datalist>`;
+}
+function pronoFilterBar(){
+  const jours=[["all","Toutes"],["1","Journée 1"],["2","Journée 2"],["3","Journée 3"],["finale","Phase finale"]];
+  const jourOpts=jours.map(([v,l])=>`<option value="${v}" ${pronoFilter.jour===v?"selected":""}>${l}</option>`).join("");
+  const hours=[...new Set((apiMatches||[]).map(parisHour).filter(Boolean))].sort();
+  const hourOpts=`<option value="all">Toutes</option>`+hours.map(h=>`<option value="${h}" ${pronoFilter.heure===h?"selected":""}>${h}</option>`).join("");
+  const active=pronoFilter.jour!=="all"||pronoFilter.heure!=="all"||pronoFilter.team;
+  return `<div class="pfilters">
+    <div class="field"><label>Journée</label><select onchange="setPronoFilter('jour',this.value)">${jourOpts}</select></div>
+    <div class="field"><label>Heure (Paris)</label><select onchange="setPronoFilter('heure',this.value)">${hourOpts}</select></div>
+    <div class="field"><label>Équipe</label><input id="pronoTeam" list="teamlist" autocomplete="off" placeholder="ex. France, Brésil…" value="${escAttr(pronoFilter.team)}" oninput="setPronoFilter('team',this.value)"></div>
+    ${active?`<button class="chip" style="align-self:center" onclick="resetPronoFilter()">✕ Réinitialiser</button>`:""}
+    ${teamDatalist()}
+  </div>`;
+}
+
+// Construit la liste des matchs (filtres + poules par journée + phase finale à part).
 function pronoMatchesHTML(){
   ensureApiMatches();
   if(!apiMatches){
@@ -1604,23 +1641,39 @@ function pronoMatchesHTML(){
   const banner=apiMatchesError
     ? `<p class="sub" style="color:var(--red)">⚠️ Mise à jour impossible (${escAttr(apiMatchesError)}) — affichage du cache. <a href="#" onclick="reloadApiMatches();return false">Réessayer</a></p>`
     : "";
-  const groups=apiMatches.filter(m=>m.stage==="GROUP_STAGE");
-  const finals=apiMatches.filter(m=>m.stage && m.stage!=="GROUP_STAGE");
 
-  let html=banner;
+  // --- application des filtres ---
+  const q=norm(pronoFilter.team);
+  const teamMatch=m=>{
+    if(!q)return true;
+    const f=[];[m.homeTeam,m.awayTeam].forEach(t=>{if(t){f.push(teamFrName(t));if(t.tla)f.push(t.tla);if(t.name)f.push(t.name)}});
+    return f.some(x=>norm(x).includes(q));
+  };
+  let groups=apiMatches.filter(m=>m.stage==="GROUP_STAGE");
+  let finals=apiMatches.filter(m=>m.stage && m.stage!=="GROUP_STAGE");
+  if(pronoFilter.jour==="finale"){groups=[]}
+  else if(pronoFilter.jour!=="all"){groups=groups.filter(m=>(m.matchday||0)===+pronoFilter.jour);finals=[]}
+  if(pronoFilter.heure!=="all"){groups=groups.filter(m=>parisHour(m)===pronoFilter.heure);finals=finals.filter(m=>parisHour(m)===pronoFilter.heure)}
+  groups=groups.filter(teamMatch);finals=finals.filter(teamMatch);
+
+  let html=banner+pronoFilterBar();
+  let listed=0;
   const byDay={};
   groups.forEach(m=>{const d=m.matchday||0;(byDay[d]=byDay[d]||[]).push(m)});
   Object.keys(byDay).map(Number).sort((a,b)=>a-b).forEach(d=>{
     const ms=byDay[d].sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
+    listed+=ms.length;
     html+=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`+ms.map(matchPronoRow).join("");
   });
   if(finals.length){
     finals.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
+    listed+=finals.length;
     html+=`<h4 class="mdh">Phase finale</h4>
       <p class="sub" style="margin:-2px 0 8px">Équipes à déterminer · pronos de phase finale à venir.</p>`
       +finals.map(finalRow).join("");
   }
-  return html||`<p class="sub">Aucun match pour l'instant.</p>`;
+  if(!listed)html+=emptyState("🔍","Aucun match","Aucun match ne correspond à tes filtres.");
+  return html;
 }
 
 function renderPronos(){
