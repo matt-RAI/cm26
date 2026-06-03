@@ -382,9 +382,10 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .toggle.on .sw::after{transform:translateX(19px);background:#fff}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
-.field input{width:100%;background:var(--ink-2);border:1px solid var(--line);border-radius:11px;color:var(--paper);
+.field input,.field select{width:100%;background:var(--ink-2);border:1px solid var(--line);border-radius:11px;color:var(--paper);
   font-family:'Archivo';font-size:14px;padding:11px 13px;outline:none;transition:.16s}
-.field input:focus{border-color:var(--grass)}
+.field select{cursor:pointer}
+.field input:focus,.field select:focus{border-color:var(--grass)}
 .field .hint{font-size:11px;color:var(--muted-2);margin-top:5px}
 .discreet-name{font-family:'DM Mono';font-size:13px;color:var(--gold);background:var(--gold-soft);
   border:1px solid rgba(236,184,74,.3);border-radius:9px;padding:9px 12px;margin-bottom:14px;display:none;align-items:center;gap:8px}
@@ -700,6 +701,7 @@ let state={
   user:store.get("tifo_user",null),
   profile:store.get("cm26_profile",null), // { id, pseudo }
   orgas:store.get("cm26_orgas",[]),       // [ { id, nom, code } ]
+  tournoi:store.get("cm26_tournoi",null), // { champion, finalist, top_scorer, best_player }
   watch:store.get("tifo_watch",[]),
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
@@ -788,7 +790,7 @@ function drawLogin(){
     <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
     <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
 }
-function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];loadedUserId=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);renderAuth();render();toast("À plus 👋")}
+function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À plus 👋")}
 
 /* ============================================================
    CONNEXION GOOGLE via SUPABASE
@@ -822,8 +824,8 @@ function applySupabaseSession(session){
     // Charge profil + orgas une seule fois par utilisateur connecté
     if(u.id!==loadedUserId){ loadedUserId=u.id; loadUserData(u.id); }
   }else{
-    state.user=null; state.profile=null; state.orgas=[];
-    store.set("tifo_user",null); store.set("cm26_profile",null); store.set("cm26_orgas",[]);
+    state.user=null; state.profile=null; state.orgas=[]; state.tournoi=null;
+    store.set("tifo_user",null); store.set("cm26_profile",null); store.set("cm26_orgas",[]); store.set("cm26_tournoi",null);
     loadedUserId=null;
     renderAuth();render();
   }
@@ -857,7 +859,18 @@ async function loadUserData(userId){
   }
   state.profile=prof; store.set("cm26_profile",prof);
   await loadOrgas(userId);
+  await loadTournamentPredictions(userId);
   renderAuth();render();
+}
+
+// Charge les pronos de tournoi (vainqueur, finaliste, buteur, joueur) de l'utilisateur.
+async function loadTournamentPredictions(userId){
+  const {data,error}=await supabase
+    .from("tournament_predictions")
+    .select("champion,finalist,top_scorer,best_player").eq("user_id",userId).maybeSingle();
+  if(error){toast("Erreur chargement des pronos de tournoi : "+error.message);return}
+  state.tournoi=data||null;
+  store.set("cm26_tournoi",state.tournoi);
 }
 
 // Charge la liste des orgas de l'utilisateur (un user peut être dans plusieurs orgas).
@@ -1266,6 +1279,99 @@ function exportAll(){calCtx={id:"ALL",discreet:false,dn:DISCREET[0]};
 }
 
 /* ---------- PRONOS ---------- */
+/* ============================================================
+   PRONOS DE TOURNOI (4 questions longue durée) — Supabase
+============================================================ */
+const TOP_SCORERS = ["Kylian Mbappé (France)","Erling Haaland (Norvège)","Harry Kane (Angleterre)","Vinícius Jr (Brésil)","Lautaro Martínez (Argentine)","Julián Álvarez (Argentine)","Lamine Yamal (Espagne)","Olmo / Ferran (Espagne)","Memphis Depay (Pays-Bas)","Cody Gakpo (Pays-Bas)","Romelu Lukaku (Belgique)","Victor Osimhen (Nigeria - si qualifié)","Mohamed Salah (Égypte - si qualifié)","Dušan Vlahović (Serbie)","Aleksandar Mitrović (Serbie)","Kai Havertz (Allemagne)","Niclas Füllkrug (Allemagne)","Rasmus Højlund (Danemark)","Gonçalo Ramos (Portugal)","Cristiano Ronaldo (Portugal)","Rafael Leão (Portugal)","Jude Bellingham (Angleterre)","Bukayo Saka (Angleterre)","Ousmane Dembélé (France)","Marcus Thuram (France)","Christian Pulisic (USA)","Raphinha (Brésil)","Rodrygo (Brésil)","Phil Foden (Angleterre)","Antoine Griezmann (France)"];
+
+const BEST_PLAYERS = ["Kylian Mbappé (France)","Jude Bellingham (Angleterre)","Vinícius Jr (Brésil)","Lamine Yamal (Espagne)","Rodri (Espagne)","Erling Haaland (Norvège)","Pedri (Espagne)","Phil Foden (Angleterre)","Kevin De Bruyne (Belgique)","Bukayo Saka (Angleterre)","Florian Wirtz (Allemagne)","Jamal Musiala (Allemagne)","Antoine Griezmann (France)","Aurélien Tchouaméni (France)","Federico Valverde (Uruguay)","Lautaro Martínez (Argentine)","Lionel Messi (Argentine - si qualifié)","Rafael Leão (Portugal)","Bruno Fernandes (Portugal)","Frenkie de Jong (Pays-Bas)","Cristiano Ronaldo (Portugal)","Harry Kane (Angleterre)","Christian Pulisic (USA)","Raphinha (Brésil)","Declan Rice (Angleterre)"];
+
+// Date de coup d'envoi : avant -> modifiable ; après -> verrouillé.
+const KICKOFF = new Date("2026-06-11T00:00:00");
+function tournamentLocked(){return new Date()>=KICKOFF}
+function daysToKickoff(){return Math.max(0,Math.ceil((KICKOFF-new Date())/86400000))}
+
+// petit échappement pour les valeurs mises dans des attributs HTML
+function escAttr(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+
+// Les 48 équipes (réutilise GROUPS), triées par nom pour les menus déroulants.
+function allTeamNames(){
+  const names=[];
+  Object.values(GROUPS).forEach(arr=>arr.forEach(c=>names.push(nm(c))));
+  return names.sort((a,b)=>a.localeCompare(b,"fr"));
+}
+function teamOptions(selected){
+  return `<option value="">— choisir —</option>`+allTeamNames()
+    .map(n=>`<option value="${escAttr(n)}" ${n===selected?"selected":""}>${n}</option>`).join("");
+}
+// Liste prédéfinie + option "Autre…" (valeur __autre__) pour saisie libre.
+function listOptions(list,selected){
+  const custom = selected && !list.includes(selected);
+  let opts=`<option value="">— choisir —</option>`;
+  opts+=list.map(x=>`<option value="${escAttr(x)}" ${x===selected?"selected":""}>${x}</option>`).join("");
+  opts+=`<option value="__autre__" ${custom?"selected":""}>Autre…</option>`;
+  return opts;
+}
+// Affiche/masque le champ libre quand on choisit "Autre…".
+function toggleOther(id){
+  const sel=document.getElementById(id), other=document.getElementById(id+"Other");
+  if(!sel||!other)return;
+  const on=sel.value==="__autre__";
+  other.style.display=on?"block":"none";
+  if(on)other.focus();
+}
+
+function tournamentSectionHTML(){
+  // Pas connecté -> message + bouton de connexion, à la place des champs.
+  if(!state.user){
+    return `<div class="panel" style="margin-bottom:18px">
+      <h3>Mes pronos de tournoi 🏆</h3>
+      <p class="sub">Désigne le vainqueur, le finaliste, le meilleur buteur et le meilleur joueur du Mondial.</p>
+      <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Connecte-toi pour faire tes pronos.</p>
+      <button class="authbtn" style="padding:10px 20px;font-size:14px" onclick="openLogin()">Se connecter</button>
+    </div>`;
+  }
+  const t=state.tournoi||{};
+  const locked=tournamentLocked();
+  const dis=locked?"disabled":"";
+  const tsCustom = t.top_scorer && !TOP_SCORERS.includes(t.top_scorer);
+  const bpCustom = t.best_player && !BEST_PLAYERS.includes(t.best_player);
+  const status = locked
+    ? `<span style="color:var(--red);font-weight:700">Pronos verrouillés 🔒</span>`
+    : `Modifiable jusqu'au coup d'envoi (11 juin)${daysToKickoff()>0?` · J-${daysToKickoff()}`:""}`;
+  return `<div class="panel" style="margin-bottom:18px">
+    <h3>Mes pronos de tournoi 🏆</h3>
+    <p class="sub">${status}</p>
+    <div class="field"><label>🏆 Vainqueur</label>
+      <select id="tChampion" ${dis}>${teamOptions(t.champion)}</select></div>
+    <div class="field"><label>🥈 Finaliste</label>
+      <select id="tFinalist" ${dis}>${teamOptions(t.finalist)}</select></div>
+    <div class="field"><label>⚽ Meilleur buteur</label>
+      <select id="tTopScorer" ${dis} onchange="toggleOther('tTopScorer')">${listOptions(TOP_SCORERS,t.top_scorer)}</select>
+      <input id="tTopScorerOther" ${dis} placeholder="Nom du buteur" value="${tsCustom?escAttr(t.top_scorer):""}" style="margin-top:8px;display:${tsCustom?'block':'none'}"></div>
+    <div class="field"><label>⭐ Meilleur joueur</label>
+      <select id="tBestPlayer" ${dis} onchange="toggleOther('tBestPlayer')">${listOptions(BEST_PLAYERS,t.best_player)}</select>
+      <input id="tBestPlayerOther" ${dis} placeholder="Nom du joueur" value="${bpCustom?escAttr(t.best_player):""}" style="margin-top:8px;display:${bpCustom?'block':'none'}"></div>
+    ${locked?"":`<button class="savebtn" onclick="saveTournament()">💾 Enregistrer mes pronos</button>`}
+  </div>`;
+}
+
+async function saveTournament(){
+  if(!state.user){toast("Connecte-toi d'abord");return}
+  if(tournamentLocked()){toast("Pronos verrouillés 🔒");return}
+  const v=id=>{const e=document.getElementById(id);return e?e.value.trim():""};
+  const champion=v("tChampion"), finalist=v("tFinalist");
+  let top_scorer=v("tTopScorer"); if(top_scorer==="__autre__")top_scorer=v("tTopScorerOther");
+  let best_player=v("tBestPlayer"); if(best_player==="__autre__")best_player=v("tBestPlayerOther");
+  const {error}=await supabase.from("tournament_predictions").upsert(
+    {user_id:state.user.id,champion,finalist,top_scorer,best_player,updated_at:new Date().toISOString()},
+    {onConflict:"user_id"});
+  if(error){toast("Enregistrement impossible : "+error.message);return}
+  state.tournoi={champion,finalist,top_scorer,best_player};
+  store.set("cm26_tournoi",state.tournoi);
+  toast("Pronos de tournoi enregistrés ✓");
+}
+
 function renderPronos(){
   const upcoming=MATCHES.filter(m=>m.big).slice(0,8);
   const myPts=Object.keys(state.pronos).length*0; // points calculés après résultats réels
@@ -1291,7 +1397,7 @@ function renderPronos(){
   </div>`;
 
   if(!state.user){
-    view.innerHTML=hero+`<div class="split">
+    view.innerHTML=hero+tournamentSectionHTML()+`<div class="split">
       <div class="gate">
         <div class="lock">🔒</div>
         <h3>Connecte-toi pour jouer</h3>
@@ -1316,7 +1422,7 @@ function renderPronos(){
     </div>`;
   }).join("");
   const done=Object.keys(state.pronos).length;
-  view.innerHTML=hero+`
+  view.innerHTML=hero+tournamentSectionHTML()+`
   <div class="split">
     <div class="panel">
       <h3>Tes pronostics</h3>
