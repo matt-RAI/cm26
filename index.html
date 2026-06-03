@@ -767,6 +767,7 @@ function renderAuth(){
           <div class="uhead"><b>${pseudo}</b><span>${state.user.email||state.user.provider}</span><span class="uorga">🏷️ ${orgaLine}</span></div>
           <button onclick="go('pronos')">🎯 Mes pronos</button>
           <button onclick="go('watchlist')">★ Ma watchlist</button>
+          <button onclick="openOrgaManager()">➕ Créer ou rejoindre une orga</button>
           <button onclick="logout()">↩ Se déconnecter</button>
         </div>
       </div>`;
@@ -878,6 +879,11 @@ let onbOrgaMode=null;    // null (choix) | 'create' | 'join'
 let onbCreatedCode="";   // code généré à afficher
 
 function openOnboarding(){onbStep="pseudo";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on")}
+// Ouvre directement l'étape B (créer/rejoindre) depuis le menu profil, sans repasser par le pseudo.
+function openOrgaManager(){
+  const m=document.querySelector(".usermenu");if(m)m.classList.remove("on"); // ferme le menu deroulant
+  onbStep="orga";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on");
+}
 function onbSetMode(m){onbOrgaMode=m;drawOnboarding()}
 
 function drawOnboarding(){
