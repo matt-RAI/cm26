@@ -737,7 +737,6 @@ function go(v){
 ============================================================ */
 const authOverlay=document.getElementById("authOverlay");
 const authModal=document.getElementById("authModal");
-let authProvider=null;
 authOverlay.addEventListener("click",e=>{if(e.target.id==="authOverlay")closeLogin()});
 document.addEventListener("click",e=>{ // ferme le menu user au clic extérieur
   if(!e.target.closest("#authSlot")){const m=document.querySelector(".usermenu");if(m)m.classList.remove("on")}
@@ -765,48 +764,16 @@ function renderAuth(){
 }
 function toggleUserMenu(e){e.stopPropagation();document.querySelector(".usermenu").classList.toggle("on")}
 
-function openLogin(){authProvider=null;drawLogin();authOverlay.classList.add("on")}
+function openLogin(){drawLogin();authOverlay.classList.add("on")}
 function closeLogin(){authOverlay.classList.remove("on")}
 
 const G_ICON=`<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>`;
-const MS_ICON=`<svg viewBox="0 0 24 24"><path fill="#F25022" d="M2 2h9.5v9.5H2z"/><path fill="#7FBA00" d="M12.5 2H22v9.5h-9.5z"/><path fill="#00A4EF" d="M2 12.5h9.5V22H2z"/><path fill="#FFB900" d="M12.5 12.5H22V22h-9.5z"/></svg>`;
-
 function drawLogin(){
-  if(!authProvider){
-    authModal.innerHTML=`
-      <button class="close" onclick="closeLogin()">✕</button>
-      <h3>Rejoins tes potes 🍻</h3>
-      <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
-      <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>
-      <button class="provbtn" onclick="chooseProvider('microsoft')">${MS_ICON} Continuer avec Microsoft</button>
-      <div class="adivider">ou par e-mail</div>
-      <div class="field"><input id="magicEmail" type="email" inputmode="email" autocapitalize="off" autocomplete="email" placeholder="ton.mail@exemple.com"></div>
-      <button class="calbtn full" style="grid-column:auto" onclick="magicLink()">✉️ Recevoir un lien magique</button>`;
-  }else{
-    const lbl=authProvider==="google"?"Google":"Microsoft";
-    authModal.innerHTML=`
-      <button class="close" onclick="authProvider=null;drawLogin()">←</button>
-      <h3>Presque fini</h3>
-      <p class="msub">Connecté via ${lbl}. Sous quel blaze tu joues le concours ?</p>
-      <div class="field"><label>Ton pseudo</label><input id="loginName" placeholder="Momo, Greg, La Pioche…" value=""></div>
-      <button class="savebtn" style="margin-top:4px" onclick="finishLogin()">C'est parti →</button>`;
-    setTimeout(()=>{const el=document.getElementById("loginName");if(el)el.focus()},50);
-  }
-}
-function chooseProvider(p){authProvider=p;drawLogin()}
-function finishLogin(){
-  const name=(document.getElementById("loginName").value||"").trim()||"Un pote";
-  state.user={name,provider:authProvider,email:""};
-  store.set("tifo_user",state.user);
-  closeLogin();renderAuth();render();toast(`Bienvenue ${name.split(" ")[0]} 👋`);
-}
-function magicLink(){
-  const email=(document.getElementById("magicEmail").value||"").trim();
-  if(!/.+@.+\..+/.test(email)){toast("E-mail invalide");return}
-  const name=email.split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
-  state.user={name,provider:"email",email};
-  store.set("tifo_user",state.user);
-  closeLogin();renderAuth();render();toast("Connecté ✓ (démo : pas de mail envoyé)");
+  authModal.innerHTML=`
+    <button class="close" onclick="closeLogin()">✕</button>
+    <h3>Rejoins tes potes 🍻</h3>
+    <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
+    <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
 }
 function logout(){if(supabase){supabase.auth.signOut()}state.user=null;store.set("tifo_user",null);renderAuth();render();toast("À plus 👋")}
 
