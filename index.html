@@ -407,6 +407,10 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .avatar{width:29px;height:29px;border-radius:50%;background:linear-gradient(145deg,var(--grass),var(--grass-deep));
   display:grid;place-items:center;font-family:'Archivo';font-weight:700;font-size:12px;color:#fff;flex:none}
 .userchip .un{font-size:13px;font-weight:600}
+.userchip .orgabadge{font-size:11px;color:var(--muted);background:var(--ink-2);border:1px solid var(--line);
+  border-radius:999px;padding:2px 9px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.usermenu .uhead .uorga{display:block;font-size:11px;color:var(--grass);margin-top:4px;font-weight:600}
+@media(max-width:600px){.userchip .orgabadge{display:none}}
 .usermenu{position:absolute;top:calc(100% + 8px);right:0;background:var(--panel-2);border:1px solid var(--line-2);
   border-radius:13px;padding:6px;min-width:172px;box-shadow:var(--shadow);display:none;z-index:40}
 .usermenu.on{display:block;animation:pop .18s}
@@ -694,6 +698,8 @@ function genOdds(a,b){
 let state={
   view:"matchs",
   user:store.get("tifo_user",null),
+  profile:store.get("cm26_profile",null), // { id, pseudo }
+  orgas:store.get("cm26_orgas",[]),       // [ { id, nom, code } ]
   watch:store.get("tifo_watch",[]),
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
@@ -747,12 +753,18 @@ function initials(name){return name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).
 function renderAuth(){
   const slot=document.getElementById("authSlot");
   if(state.user){
+    const pseudo=(state.profile&&state.profile.pseudo)||state.user.name;
+    const ini=initials(pseudo).replace(/['"\\]/g,"");
+    const orgas=state.orgas||[];
+    const orgaLine=orgas.length?orgas.map(o=>o.nom).join(", "):"Aucune orga pour l'instant";
+    const orgaBadge=orgas.length?`<span class="orgabadge">🏷️ ${orgas[0].nom}${orgas.length>1?" +"+(orgas.length-1):""}</span>`:"";
     slot.innerHTML=`
       <div class="userchip" onclick="toggleUserMenu(event)">
-        <div class="avatar">${state.user.avatar?`<img src="${state.user.avatar}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:inherit;object-fit:cover" onerror="this.replaceWith(document.createTextNode('${initials(state.user.name)}'))">`:initials(state.user.name)}</div>
-        <span class="un">${state.user.name.split(" ")[0]}</span>
+        <div class="avatar">${state.user.avatar?`<img src="${state.user.avatar}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:inherit;object-fit:cover" onerror="this.replaceWith(document.createTextNode('${ini}'))">`:ini}</div>
+        <span class="un">${pseudo}</span>
+        ${orgaBadge}
         <div class="usermenu">
-          <div class="uhead"><b>${state.user.name}</b><span>${state.user.email||state.user.provider}</span></div>
+          <div class="uhead"><b>${pseudo}</b><span>${state.user.email||state.user.provider}</span><span class="uorga">🏷️ ${orgaLine}</span></div>
           <button onclick="go('pronos')">🎯 Mes pronos</button>
           <button onclick="go('watchlist')">★ Ma watchlist</button>
           <button onclick="logout()">↩ Se déconnecter</button>
@@ -775,7 +787,7 @@ function drawLogin(){
     <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
     <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
 }
-function logout(){if(supabase){supabase.auth.signOut()}state.user=null;store.set("tifo_user",null);renderAuth();render();toast("À plus 👋")}
+function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];loadedUserId=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);renderAuth();render();toast("À plus 👋")}
 
 /* ============================================================
    CONNEXION GOOGLE via SUPABASE
@@ -791,22 +803,29 @@ async function loginGoogle(){
   if(error){toast("Connexion impossible : "+error.message)}
 }
 
+let loadedUserId=null; // évite de relancer le chargement / l'onboarding à chaque event
+
 // Met à jour l'UI (state.user + header) à partir d'une session Supabase.
 function applySupabaseSession(session){
   if(session && session.user){
     const u=session.user, meta=u.user_metadata||{};
     state.user={
+      id: u.id,
       name: meta.full_name || meta.name || (u.email? u.email.split("@")[0] : "Un pote"),
       provider: (u.app_metadata && u.app_metadata.provider) || "google",
       email: u.email || "",
       avatar: meta.avatar_url || meta.picture || ""
     };
     store.set("tifo_user",state.user);
+    renderAuth();render();
+    // Charge profil + orgas une seule fois par utilisateur connecté
+    if(u.id!==loadedUserId){ loadedUserId=u.id; loadUserData(u.id); }
   }else{
-    state.user=null;
-    store.set("tifo_user",null);
+    state.user=null; state.profile=null; state.orgas=[];
+    store.set("tifo_user",null); store.set("cm26_profile",null); store.set("cm26_orgas",[]);
+    loadedUserId=null;
+    renderAuth();render();
   }
-  renderAuth();render();
 }
 
 // Charge le SDK Supabase (CDN esm.sh), vérifie la session et écoute les changements.
@@ -821,6 +840,162 @@ async function initSupabaseAuth(){
     console.error("Supabase init échouée",e);
   }
 }
+
+/* ============================================================
+   ONBOARDING (profil + organisation) + CHARGEMENT DES DONNÉES
+============================================================ */
+// Après connexion : a-t-il déjà un profil ? Sinon -> onboarding.
+async function loadUserData(userId){
+  const {data:prof,error:pErr}=await supabase
+    .from("profiles").select("id,pseudo").eq("id",userId).maybeSingle();
+  if(pErr){toast("Erreur de chargement du profil : "+pErr.message);return}
+  if(!prof){
+    state.profile=null; store.set("cm26_profile",null);
+    openOnboarding(); // pas de profil -> on demande pseudo + orga
+    return;
+  }
+  state.profile=prof; store.set("cm26_profile",prof);
+  await loadOrgas(userId);
+  renderAuth();render();
+}
+
+// Charge la liste des orgas de l'utilisateur (un user peut être dans plusieurs orgas).
+async function loadOrgas(userId){
+  const {data:members,error}=await supabase
+    .from("orga_members").select("orga_id").eq("user_id",userId);
+  if(error){toast("Erreur de chargement des orgas : "+error.message);state.orgas=[];store.set("cm26_orgas",[]);return}
+  const ids=(members||[]).map(m=>m.orga_id);
+  if(!ids.length){state.orgas=[];store.set("cm26_orgas",[]);return}
+  const {data:orgas,error:e2}=await supabase
+    .from("orgas").select("id,nom,code").in("id",ids);
+  if(e2){toast("Erreur de chargement des orgas : "+e2.message);state.orgas=[];store.set("cm26_orgas",[]);return}
+  state.orgas=orgas||[]; store.set("cm26_orgas",state.orgas);
+}
+
+// --- État local de la modale d'onboarding ---
+let onbStep=null;        // 'pseudo' | 'orga' | 'created'
+let onbOrgaMode=null;    // null (choix) | 'create' | 'join'
+let onbCreatedCode="";   // code généré à afficher
+
+function openOnboarding(){onbStep="pseudo";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on")}
+function onbSetMode(m){onbOrgaMode=m;drawOnboarding()}
+
+function drawOnboarding(){
+  if(onbStep==="pseudo"){
+    authModal.innerHTML=`
+      <h3>Bienvenue 👋</h3>
+      <p class="msub">Choisis ton pseudo pour le concours de pronos. (20 caractères max)</p>
+      <div class="field"><label>Ton pseudo</label>
+        <input id="onbPseudo" maxlength="20" placeholder="Momo, Greg, La Pioche…" value="${(state.user&&state.user.name?state.user.name.split(" ")[0]:"").slice(0,20)}"></div>
+      <button class="savebtn" onclick="submitPseudo()">Continuer →</button>`;
+    setTimeout(()=>{const el=document.getElementById("onbPseudo");if(el){el.focus();el.select()}},50);
+  }else if(onbStep==="orga"){
+    if(!onbOrgaMode){
+      authModal.innerHTML=`
+        <h3>Ton organisation</h3>
+        <p class="msub">Rejoins l'orga de tes collègues avec un code, ou crée la tienne.</p>
+        <button class="provbtn" onclick="onbSetMode('create')">➕ Créer une orga</button>
+        <button class="provbtn" onclick="onbSetMode('join')">🔑 Rejoindre une orga</button>
+        <div style="text-align:center;margin-top:14px"><a href="#" onclick="skipOrga();return false" style="color:var(--muted);font-size:13px">Plus tard →</a></div>`;
+    }else if(onbOrgaMode==="create"){
+      authModal.innerHTML=`
+        <button class="close" onclick="onbSetMode(null)">←</button>
+        <h3>Créer une orga</h3>
+        <p class="msub">Donne-lui un nom. Tu obtiendras un code à partager à tes collègues.</p>
+        <div class="field"><label>Nom de l'orga</label>
+          <input id="onbOrgaNom" maxlength="40" placeholder="WorkPlay, Les Bleus du bureau…"></div>
+        <button class="savebtn" onclick="createOrga()">Créer →</button>`;
+      setTimeout(()=>{const el=document.getElementById("onbOrgaNom");if(el)el.focus()},50);
+    }else{ // join
+      authModal.innerHTML=`
+        <button class="close" onclick="onbSetMode(null)">←</button>
+        <h3>Rejoindre une orga</h3>
+        <p class="msub">Entre le code que ton collègue t'a partagé.</p>
+        <div class="field"><label>Code de l'orga</label>
+          <input id="onbOrgaCode" maxlength="6" style="text-transform:uppercase;letter-spacing:2px" placeholder="WPLAY7"></div>
+        <button class="savebtn" onclick="joinOrga()">Rejoindre →</button>`;
+      setTimeout(()=>{const el=document.getElementById("onbOrgaCode");if(el)el.focus()},50);
+    }
+  }else if(onbStep==="created"){
+    authModal.innerHTML=`
+      <h3>Orga créée 🎉</h3>
+      <p class="msub">Partage ce code à tes collègues pour qu'ils rejoignent ton orga :</p>
+      <div class="field"><input id="createdCode" readonly value="${onbCreatedCode}"
+        style="text-align:center;font-size:24px;letter-spacing:4px;font-weight:700"></div>
+      <button class="calbtn full" style="grid-column:auto" onclick="copyCode()">📋 Copier le code</button>
+      <button class="savebtn" onclick="finishOnboarding()">Entrer dans l'app →</button>`;
+  }
+}
+
+// ÉTAPE A — enregistrement du pseudo
+async function submitPseudo(){
+  const pseudo=(document.getElementById("onbPseudo").value||"").trim();
+  if(!pseudo){toast("Le pseudo est obligatoire");return}
+  if(pseudo.length>20){toast("Pseudo trop long (20 caractères max)");return}
+  const {data,error}=await supabase
+    .from("profiles").insert({id:state.user.id,pseudo}).select("id,pseudo").single();
+  if(error){toast("Impossible d'enregistrer le pseudo : "+error.message);return}
+  state.profile=data; store.set("cm26_profile",data);
+  renderAuth();
+  onbStep="orga"; onbOrgaMode=null; drawOnboarding();
+}
+
+// Génère un code court lisible : 6 caractères A-Z 0-9
+function genOrgaCode(){
+  const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let s=""; for(let i=0;i<6;i++){s+=chars[Math.floor(Math.random()*chars.length)]}
+  return s;
+}
+
+// ÉTAPE B (option 1) — créer une orga
+async function createOrga(){
+  const nom=(document.getElementById("onbOrgaNom").value||"").trim();
+  if(!nom){toast("Donne un nom à ton orga");return}
+  let orga=null,lastErr=null;
+  // jusqu'à 5 essais si le code généré existe déjà (très rare)
+  for(let i=0;i<5 && !orga;i++){
+    const code=genOrgaCode();
+    const {data,error}=await supabase
+      .from("orgas").insert({nom,code,owner:state.user.id}).select("id,nom,code").single();
+    if(error){lastErr=error; if(error.code==="23505"){continue} else {break}}
+    orga=data;
+  }
+  if(!orga){toast("Création impossible : "+(lastErr?lastErr.message:"erreur inconnue"));return}
+  const {error:mErr}=await supabase
+    .from("orga_members").insert({orga_id:orga.id,user_id:state.user.id});
+  if(mErr){toast("Orga créée, mais adhésion échouée : "+mErr.message)}
+  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas);
+  renderAuth();
+  onbCreatedCode=orga.code; onbStep="created"; drawOnboarding();
+}
+
+// ÉTAPE B (option 2) — rejoindre une orga par code
+async function joinOrga(){
+  const code=(document.getElementById("onbOrgaCode").value||"").trim().toUpperCase();
+  if(!code){toast("Entre un code");return}
+  const {data:orga,error}=await supabase
+    .from("orgas").select("id,nom,code").eq("code",code).maybeSingle();
+  if(error){toast("Erreur : "+error.message);return}
+  if(!orga){toast("Code introuvable");return}
+  if((state.orgas||[]).some(o=>o.id===orga.id)){toast("Tu es déjà dans cette orga");finishOnboarding();return}
+  const {error:mErr}=await supabase
+    .from("orga_members").insert({orga_id:orga.id,user_id:state.user.id});
+  if(mErr){toast("Impossible de rejoindre : "+mErr.message);return}
+  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas);
+  toast("Bienvenue dans "+orga.nom+" 🎉");
+  finishOnboarding();
+}
+
+function copyCode(){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(onbCreatedCode)
+      .then(()=>toast("Code copié ✓"))
+      .catch(()=>toast("Copie impossible — note-le à la main : "+onbCreatedCode));
+  }else{toast("Note le code à la main : "+onbCreatedCode)}
+}
+
+function skipOrga(){finishOnboarding()}
+function finishOnboarding(){onbStep=null;onbOrgaMode=null;closeLogin();renderAuth();render()}
 
 function flagHTML(code){
   const iso=T[code][2];
