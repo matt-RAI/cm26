@@ -158,6 +158,22 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .hero-meta div:nth-child(odd) b{color:var(--red)}
 .hero-meta div:nth-child(even) b{color:var(--blue)}
 .hero-meta span{color:#6f87b6;font-size:12px;margin-top:3px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+/* Hero de bienvenue (repliable) */
+.hero-x{position:absolute;top:14px;right:14px;z-index:2;width:30px;height:30px;border-radius:50%;
+  border:1.5px solid #0a1733;background:#fbfaf5;color:#0a1733;font-size:13px;cursor:pointer;line-height:1;
+  display:grid;place-items:center;transition:.15s}
+.hero-x:hover{background:var(--red);color:#fff;border-color:var(--red);transform:rotate(90deg)}
+.herofeats{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.herofeats .hf{flex:1;min-width:150px;display:flex;flex-direction:column;
+  background:rgba(10,23,51,.05);border:1px solid rgba(10,23,51,.12);border-radius:12px;padding:11px 13px}
+.herofeats .hf-i{font-size:20px;line-height:1}
+.herofeats .hf b{font-family:'Archivo';font-weight:700;font-size:13.5px;color:#0a1733;margin-top:5px}
+.herofeats .hf-d{font-size:11.5px;color:#5a6b8c;line-height:1.35;margin-top:2px}
+@media(max-width:600px){.herofeats{display:grid;grid-template-columns:1fr 1fr;gap:10px}}
+.hero-collapsed{display:inline-flex;align-items:center;gap:8px;margin-bottom:24px;cursor:pointer;
+  font-family:'Archivo';font-weight:700;font-size:13px;color:var(--muted);
+  background:var(--panel);border:1px dashed var(--line-2);border-radius:999px;padding:8px 16px;transition:.15s}
+.hero-collapsed:hover{border-color:var(--red);color:var(--paper);transform:translateY(-1px)}
 .eaglebtn{background:var(--panel);border:1px solid var(--line);border-radius:11px;width:38px;height:38px;
   font-size:18px;cursor:pointer;transition:transform .15s,border-color .15s;line-height:1;flex:none}
 .eaglebtn:hover{border-color:var(--blue);transform:translateY(-2px) rotate(-9deg)}
@@ -1709,12 +1725,30 @@ function pronoMatchesHTML(){
   return html;
 }
 
-function renderPronos(){
-  const hero=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
-    <div class="kick">Concours entre potes</div>
-    <h2 style="font-size:28px">Le concours de pronos 🎯</h2>
-    <p>Pronostique le score des grosses affiches. <b style="color:var(--red)">3 pts</b> au score exact, <b style="color:var(--blue)">1 pt</b> au bon résultat. Le boss du classement paie la tournée. 🍻</p>
+/* Hero de bienvenue repliable (etat memorise dans localStorage) */
+function dismissHero(){store.set("cm26_hero_dismissed",true);render()}
+function expandHero(){store.set("cm26_hero_dismissed",false);render()}
+function heroWelcomeHTML(){
+  if(store.get("cm26_hero_dismissed",false)){
+    return `<button class="hero-collapsed" onclick="expandHero()">▸ À propos de CM26</button>`;
+  }
+  return `<div class="hero hero-welcome">
+    <button class="hero-x" onclick="dismissHero()" title="J'ai compris">✕</button>
+    <div class="kick">Bienvenue 🇺🇸 🇲🇽 🇨🇦</div>
+    <h2 style="font-size:clamp(30px,5vw,46px)">Ton QG du Mondial 🦅</h2>
+    <p>Suis tous les matchs, prono, partage ton agenda en douce et chambre tes potes.</p>
+    <div class="herofeats">
+      <div class="hf"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">104 matchs, heure de Paris + chaîne TV</span></div>
+      <div class="hf"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">tes matchs à ne pas rater</span></div>
+      <div class="hf"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">dans ton Google Agenda, l'air de rien</span></div>
+      <div class="hf"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">chambre tes potes au classement</span></div>
+      <div class="hf"><span class="hf-i">🦅</span><b>Morning Resumay</b><span class="hf-d">le débrief de l'aigle</span></div>
+    </div>
   </div>`;
+}
+
+function renderPronos(){
+  const hero=`${resumayHTML()}${heroWelcomeHTML()}`;
 
   if(!state.user){
     view.innerHTML=hero+tournamentSectionHTML()+`
