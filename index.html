@@ -324,7 +324,9 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .scorebox input:focus{border-color:var(--grass)}
 .scorebox span{color:var(--muted-2);font-weight:700}
 .scorebox .sc{font-family:'DM Mono';font-weight:700;font-size:20px;color:var(--paper)}
-.prono .pmeta{grid-column:1/-1;text-align:center;font-size:11px;color:var(--muted-2);margin-top:2px;display:flex;align-items:center;justify-content:center;gap:8px}
+.prono .pmeta{grid-column:1/-1;font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.prono .pmeta .pacts{display:flex;gap:6px;margin-left:6px}
+.iconbtn.sm{width:30px;height:30px;border-radius:9px;font-size:14px}
 .pbadge{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
 .pbadge.fin{color:var(--muted-2)}
 .pbadge.live{color:var(--red);border-color:var(--red)}
@@ -555,13 +557,12 @@ footer b{color:var(--muted)}
 
   <nav>
     <div class="navbar-m">
-      <span class="cur" id="curTab">Matchs</span>
+      <span class="cur" id="curTab">Matchs &amp; Pronos</span>
       <button class="burger" id="burger" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>
     <div class="tabs" id="tabs">
-      <button class="tab on" data-v="matchs">⚽ Matchs</button>
+      <button class="tab on" data-v="pronos">⚽ Matchs &amp; Pronos</button>
       <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge">0</span></button>
-      <button class="tab" data-v="pronos">🎯 Pronos</button>
       <button class="tab" data-v="classement">🏆 Classement</button>
       <button class="tab" data-v="groupes">🗂️ Groupes</button>
       <button class="tab" data-v="infos">📰 Infos</button>
@@ -647,67 +648,15 @@ const GROUPS={
   G:["BEL","IRN","EGY","NZL"], H:["ESP","URU","KSA","CPV"], I:["FRA","SEN","NOR","IRQ"],
   J:["ARG","AUT","ALG","JOR"], K:["POR","COL","UZB","COD"], L:["ENG","CRO","PAN","GHA"]
 };
-// équipes "tête d'affiche" (chapeau 1 + favorites) → match important = vert
-const BIG=new Set(["FRA","BRA","ESP","ARG","ENG","POR","GER","NED","BEL","MEX","USA","CAN","MAR","URU","CRO","COL","JPN","SEN"]);
-
-/* ---- génération du calendrier de poules (vraies affiches, horaires indicatifs) ---- */
-// ordre des journées dans une poule : J1(1-2,3-4) J2(1-3,2-4) J3(1-4,2-3)
-const PAIRS=[[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
-const SLOTS=["18:00","21:00","00:00"];
-let MATCHES=[];
-let gid=0;
-// répartit les poules sur les jours du 11 au 26 juin
-const groupKeys=Object.keys(GROUPS);
-groupKeys.forEach((g,gi)=>{
-  const teams=GROUPS[g];
-  PAIRS.forEach((p,round)=>{
-    const baseDay=11+gi+round*5; // étale ~ sur la fenêtre
-    const day=Math.min(26,baseDay-Math.floor(gi/3));
-    const slot=SLOTS[(gi+round)%3];
-    const a=teams[p[0]],b=teams[p[1]];
-    const big=BIG.has(a)&&BIG.has(b) || a==="FRA"||b==="FRA";
-    MATCHES.push({id:"m"+(gid++),day:"2026-06-"+String(day).padStart(2,"0"),time:slot,
-      a,b,stage:"Phase de groupes",group:g,
-      venue:"",
-      chan: (big?["m6","bein"]:["bein"]),
-      odds:genOdds(a,b), big});
-  });
-});
-// ---- ancres CONFIRMÉES (on écrase les générés) ----
-function pin(a,b,day,time,chan,big){
-  // retire un éventuel doublon de la même affiche
-  MATCHES=MATCHES.filter(m=>!((m.a===a&&m.b===b)||(m.a===b&&m.b===a)));
-  MATCHES.push({id:"pin_"+a+b,day,time,a,b,stage:"Phase de groupes",
-    group:groupOf(a),venue:"",chan,odds:genOdds(a,b),big,confirmed:true});
-}
-function groupOf(c){return Object.keys(GROUPS).find(g=>GROUPS[g].includes(c))||""}
-pin("MEX","RSA","2026-06-11","02:00",["bein"],true);      // ouverture, Estadio Azteca (heure FR indicative)
-pin("FRA","SEN","2026-06-16","21:00",["m6","bein"],true); // confirmé
-pin("FRA","IRQ","2026-06-22","23:00",["m6","bein"],true); // confirmé
-pin("NOR","FRA","2026-06-26","21:00",["m6","bein"],true); // confirmé
-// quelques affiches knockout (placeholders à brancher après la phase de groupes)
-[["BRA","ESP","2026-07-04","21:00","8e de finale"],
- ["ARG","POR","2026-07-09","21:00","Quart de finale"],
- ["FRA","ENG","2026-07-17","21:00","Demi-finale"]].forEach(([a,b,day,time,st])=>{
-  MATCHES.push({id:"ko_"+a+b,day,time,a,b,stage:st,group:"",venue:"",
-    chan:["m6","bein"],odds:genOdds(a,b),big:true,placeholder:true});
-});
-MATCHES.sort((x,y)=> (x.day+x.time).localeCompare(y.day+y.time));
-
-function genOdds(a,b){
-  // cote indicative basée sur le "prestige" des nations
-  const w=c=>BIG.has(c)?1.7:2.6;
-  let h=+(w(a)*(0.8+Math.random()*0.5)).toFixed(2);
-  let aw=+(w(b)*(0.9+Math.random()*0.6)).toFixed(2);
-  let d=+(3.0+Math.random()*1.3).toFixed(2);
-  return {h:Math.max(1.25,h),d,a:Math.max(1.25,aw)};
-}
+// NB : les matchs ne sont plus codés en dur. Ils viennent désormais de l'API
+// football-data.org (voir apiMatches / loadApiMatches plus bas). GROUPS et T
+// restent utilisés pour l'onglet Groupes, les drapeaux et le mapping FR.
 
 /* ============================================================
    ÉTAT
 ============================================================ */
 let state={
-  view:"matchs",
+  view:"pronos", // onglet fusionné "Matchs & Pronos"
   user:store.get("tifo_user",null),
   profile:store.get("cm26_profile",null), // { id, pseudo }
   orgas:store.get("cm26_orgas",[]),       // [ { id, nom, code } ]
@@ -718,8 +667,7 @@ let state={
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
   resumayLoading:false,
-  resumayOpen:store.get("cm26_resumayOpen",false),
-  filter:{when:"all",team:"",bigOnly:false,bleus:false,q:""}
+  resumayOpen:store.get("cm26_resumayOpen",false)
 };
 function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",state.pronos)}
 
@@ -734,7 +682,7 @@ const FRIENDS=[
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={matchs:"Matchs",watchlist:"Ma watchlist",pronos:"Pronos",classement:"Classement",groupes:"Groupes",infos:"Infos"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",groupes:"Groupes",infos:"Infos"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -1069,7 +1017,6 @@ function fmtDay(d){
 
 function render(){
   document.getElementById("wlBadge").textContent=state.watch.length;
-  if(state.view==="matchs")return renderMatches();
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
   if(state.view==="classement")return renderClassement();
@@ -1077,96 +1024,10 @@ function render(){
   if(state.view==="infos")return renderInfos();
 }
 
-/* ---------- MATCHS ---------- */
-function matchCard(m){
-  const fav = m.odds.h<m.odds.a ? "h":"a";
-  const chan = m.chan.map(c=>c==="m6"?`<b class="m6">M6</b>`:`<b class="bein">beIN</b>`).join("");
-  return `<div class="match ${m.big?"big":""} ${isWatched(m.id)?"watched":""}">
-    <div class="mtime">
-      <div class="t">${m.time}</div><div class="tz">heure FR</div>
-      ${m.big?`<div class="bigtag">HOT</div>`:``}
-    </div>
-    <div class="teams">
-      <div class="team">${flagHTML(m.a)}<span class="nm">${nm(m.a)}</span><span class="cd">${m.a}</span></div>
-      <div class="team">${flagHTML(m.b)}<span class="nm">${nm(m.b)}</span><span class="cd">${m.b}</span></div>
-      <div class="mstage">
-        ${m.group?`<span class="grp">Groupe ${m.group}</span>`:`<span class="grp">${m.stage}</span>`}
-        <span class="chan">📺 ${chan}</span>
-        ${m.placeholder?`<span style="color:var(--muted-2)">· affiche pronostiquée</span>`:``}
-      </div>
-    </div>
-    <div class="macts">
-      <div class="odds" title="Cotes indicatives 1 N 2">
-        <div class="odd ${fav==='h'?'fav':''}"><span class="lbl">1</span><span class="val">${m.odds.h.toFixed(2)}</span></div>
-        <div class="odd"><span class="lbl">N</span><span class="val">${m.odds.d.toFixed(2)}</span></div>
-        <div class="odd ${fav==='a'?'fav':''}"><span class="lbl">2</span><span class="val">${m.odds.a.toFixed(2)}</span></div>
-      </div>
-      <button class="iconbtn star ${isWatched(m.id)?'on':''}" title="Ajouter à ma watchlist" onclick="toggleWatch('${m.id}')">
-        ${isWatched(m.id)?'★':'☆'}
-      </button>
-      <button class="iconbtn cal" title="Ajouter à mon agenda" onclick="openCal('${m.id}')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-      </button>
-    </div>
-  </div>`;
-}
-
-function applyFilter(list){
-  const f=state.filter;
-  return list.filter(m=>{
-    if(f.bigOnly && !m.big)return false;
-    if(f.bleus && m.a!=="FRA" && m.b!=="FRA")return false;
-    if(f.when==="groups" && m.stage!=="Phase de groupes")return false;
-    if(f.when==="ko" && m.stage==="Phase de groupes")return false;
-    if(f.q){const q=f.q.toLowerCase();if(!(nm(m.a).toLowerCase().includes(q)||nm(m.b).toLowerCase().includes(q)))return false}
-    return true;
-  });
-}
-
-function renderMatches(){
-  const big=MATCHES.filter(m=>m.big).length;
-  const list=applyFilter(MATCHES);
-  const byDay={};list.forEach(m=>{(byDay[m.day]=byDay[m.day]||[]).push(m)});
-  let html=`
-  ${resumayHTML()}
-  <div class="hero">
-    <div class="kick">★ 11 juin → 19 juillet 2026 · USA · Canada · Mexico ★</div>
-    <h2>Kiki, it's time to shine.</h2>
-    <p>Repère les chocs, mets-les en watchlist, balance-les dans ton agenda et écrase tes potes au concours de pronos. Let's go. 🦅</p>
-    <div class="hero-meta">
-      <div><b>48</b><span>équipes</span></div>
-      <div><b>104</b><span>matchs</span></div>
-      <div><b>12</b><span>groupes</span></div>
-      <div><b>${big}</b><span>grosses affiches</span></div>
-    </div>
-  </div>
-  <div class="filters">
-    <button class="chip ${state.filter.when==='all'?'on':''}" onclick="setF('when','all')">Tout</button>
-    <button class="chip ${state.filter.when==='groups'?'on':''}" onclick="setF('when','groups')">Phase de groupes</button>
-    <button class="chip ${state.filter.when==='ko'?'on':''}" onclick="setF('when','ko')">Élimination directe</button>
-    <button class="chip blue ${state.filter.bleus?'on':''}" onclick="setF('bleus',${!state.filter.bleus})">🇫🇷 Mes Bleus</button>
-    <button class="chip ${state.filter.bigOnly?'on':''}" onclick="setF('bigOnly',${!state.filter.bigOnly})">🟢 Affiches seulement</button>
-    <div class="sep"></div>
-    <div class="search">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="searchInput" autocomplete="off" autocapitalize="words" placeholder="Une équipe…" value="${state.filter.q}" oninput="setF('q',this.value)">
-    </div>
-  </div>`;
-  if(!list.length){html+=emptyState("🔍","Aucun match","Élargis tes filtres pour retrouver des affiches.")}
-  Object.keys(byDay).sort().forEach((d,i)=>{
-    html+=`<div class="daygroup" style="animation-delay:${i*.04}s">
-      <div class="dayhead"><h3>${fmtDay(d)}</h3><div class="ln"></div><span class="cnt">${byDay[d].length} match${byDay[d].length>1?'s':''}</span></div>
-      ${byDay[d].map(matchCard).join("")}</div>`;
-  });
-  view.innerHTML=html;
-}
-function setF(k,v){state.filter[k]=v;render();
-  if(k==='q'){const el=document.getElementById('searchInput');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
-}
-
 /* ---------- WATCHLIST ---------- */
 function renderWatchlist(){
-  const list=MATCHES.filter(m=>isWatched(m.id));
+  ensureApiMatches();
+  const list=(apiMatches||[]).filter(m=>isWatched(String(m.id)));
   let html=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
     <div class="kick">★ Ma sélection ★</div>
     <h2 style="font-size:28px">Ma watchlist</h2>
@@ -1176,10 +1037,15 @@ function renderWatchlist(){
       📅 Tout exporter (.ics) — ${list.length} match${list.length>1?'s':''}</button></div>`;
   }
   html+=`</div>`;
-  if(!list.length){
-    html+=emptyState("★","Ta watchlist est vide","Ajoute des matchs depuis l'onglet Matchs en cliquant sur l'étoile ☆.");
+  if(!apiMatches){
+    html+= apiMatchesError
+      ? emptyState("⚠️","Matchs indisponibles",escAttr(apiMatchesError))
+      : `<p class="sub">Chargement des matchs…</p>`;
+  }else if(!list.length){
+    html+=emptyState("★","Ta watchlist est vide","Ajoute des matchs depuis l'onglet « Matchs & Pronos » en cliquant sur l'étoile ☆.");
   }else{
-    list.forEach((m,i)=>{html+=`<div style="animation:rise .4s both;animation-delay:${i*.04}s">${matchCard(m)}</div>`});
+    list.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
+    list.forEach((m,i)=>{html+=`<div class="panel" style="margin-bottom:12px;animation:rise .4s both;animation-delay:${i*.04}s">${m.stage==="GROUP_STAGE"?matchPronoRow(m):finalRow(m)}</div>`});
   }
   view.innerHTML=html;
 }
@@ -1206,17 +1072,19 @@ function openCal(id){
 function closeCal(){document.getElementById("calOverlay").classList.remove("on")}
 document.getElementById("calOverlay").addEventListener("click",e=>{if(e.target.id==="calOverlay")closeCal()});
 
+function apiMatchById(id){return (apiMatches||[]).find(x=>String(x.id)===String(id))}
+
 function drawCal(){
-  const m=MATCHES.find(x=>x.id===calCtx.id);if(!m)return;
-  const title=calCtx.discreet?calCtx.dn:`${nm(m.a)} – ${nm(m.b)} · Mondial 26`;
+  const m=apiMatchById(calCtx.id);if(!m)return;
+  const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   document.getElementById("calModal").innerHTML=`
     <button class="close" onclick="closeCal()">✕</button>
     <h3>Dans mon agenda</h3>
     <p class="msub">Compatible Gmail, Outlook & Apple. Invite les potes par email.</p>
     <div class="matchprev">
-      <span class="mp-t">${flagHTML(m.a)} ${nm(m.a)}</span>
-      <span class="vs">${m.time} · ${fmtDay(m.day).split(" ").slice(0,3).join(" ")}</span>
-      <span class="mp-t">${nm(m.b)} ${flagHTML(m.b)}</span>
+      <span class="mp-t">${home.flag} ${home.name}</span>
+      <span class="vs">${fmtParis(m.utcDate)}</span>
+      <span class="mp-t">${away.name} ${away.flag}</span>
     </div>
     <div class="toggle ${calCtx.discreet?'on':''}" onclick="toggleDiscreet()">
       <div class="tl"><b>🕵️ Mode discret</b><span>Titre "pro" pour passer inaperçu sur l'agenda du taf</span></div>
@@ -1238,15 +1106,16 @@ function drawCal(){
 function toggleDiscreet(){calCtx.discreet=!calCtx.discreet;drawCal()}
 function rerollDiscreet(){calCtx.dn=DISCREET[Math.floor(Math.random()*DISCREET.length)];drawCal()}
 
-function eventTitle(m){return calCtx.discreet?calCtx.dn:`${nm(m.a)} – ${nm(m.b)} · Mondial 26`}
+function eventTitle(m){return calCtx.discreet?calCtx.dn:`${teamFrName(m.homeTeam)} – ${teamFrName(m.awayTeam)} · Mondial 26`}
 function eventDesc(m){
-  const real=`${nm(m.a)} – ${nm(m.b)} · ${m.group?'Groupe '+m.group:m.stage} · ${m.chan.map(c=>c==='m6'?'M6':'beIN Sports').join(' / ')}`;
+  const groupLabel = m.group ? "Groupe "+m.group.replace("GROUP_","") : stageLabel(m.stage);
+  const chans=channelsFor(m).map(c=>c==="m6"?"M6":"beIN Sports").join(" / ");
+  const real=`${teamFrName(m.homeTeam)} – ${teamFrName(m.awayTeam)} · ${groupLabel} · ${chans}`;
   return calCtx.discreet?`Note perso : ${real} 🤫`:real+`\\nCoupe du Monde 2026 · CM26`;
 }
-// renvoie {startUTC,endUTC} en objet Date (heure de Paris = UTC+2 en été)
+// renvoie {start,end} (Date) à partir de utcDate (déjà en UTC)
 function utcTimes(m){
-  const [H,M]=m.time.split(":").map(Number);
-  const start=new Date(`${m.day}T${m.time}:00+02:00`);
+  const start=new Date(m.utcDate);
   const end=new Date(start.getTime()+135*60000); // 2h15
   return {start,end};
 }
@@ -1254,7 +1123,7 @@ function icsStamp(d){return d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z
 function gcalStamp(d){return d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z"}
 
 function refreshGcalLink(){
-  const m=MATCHES.find(x=>x.id===calCtx.id);const {start,end}=utcTimes(m);
+  const m=apiMatchById(calCtx.id);if(!m)return;const {start,end}=utcTimes(m);
   const url="https://calendar.google.com/calendar/render?action=TEMPLATE"
     +"&text="+encodeURIComponent(eventTitle(m))
     +"&dates="+gcalStamp(start)+"/"+gcalStamp(end)
@@ -1282,7 +1151,7 @@ function buildICS(matches,guests){
   return lines.join("\r\n");
 }
 function downloadICS(withGuests){
-  const list = calCtx.id==="ALL" ? MATCHES.filter(m=>isWatched(m.id)) : [MATCHES.find(x=>x.id===calCtx.id)];
+  const list = calCtx.id==="ALL" ? (apiMatches||[]).filter(m=>isWatched(String(m.id))) : [apiMatchById(calCtx.id)].filter(Boolean);
   let guests=[];
   if(withGuests){const el=document.getElementById("guests");if(el)guests=el.value.split(",").map(s=>s.trim()).filter(Boolean)}
   const ics=buildICS(list,guests);
@@ -1605,7 +1474,7 @@ async function loadApiMatches(force){
 function ensureApiMatches(){
   if(apiMatchesLoading || apiMatchesError)return;
   const stale=!apiMatches || (Date.now()-apiMatchesTs)>=API_TTL;
-  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos")render()});
+  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos"||state.view==="watchlist")render()});
 }
 function reloadApiMatches(){apiMatchesError=null; loadApiMatches(true).then(()=>render())}
 
@@ -1662,6 +1531,50 @@ function apiMatchLocked(m){
   return new Date()>=d;
 }
 
+// --- CHAÎNES TV ---
+// Code 3 lettres du site pour une équipe API (via tla, sinon nom anglais).
+function teamCode(team){
+  if(!team)return null;
+  if(team.tla && T[team.tla])return team.tla;
+  if(team.name && EN_FR[team.name] && T[EN_FR[team.name]])return EN_FR[team.name];
+  return team.tla||null;
+}
+// Nom FR (texte brut) d'une équipe API, repli sur l'anglais.
+function teamFrName(team){
+  const c=teamCode(team);
+  if(c)return nm(c);
+  return (team&&(team.shortName||team.name))||"À déterminer";
+}
+// Affiches de groupe diffusées en clair sur M6 (clé = paire de codes triée). beIN partout.
+const M6_GROUP=new Set(["MEX|RSA","BIH|CAN","QAT|SUI","BRA|MAR","CUW|GER","JPN|NED","CPV|ESP","BEL|EGY",
+  "KSA|URU","FRA|SEN","IRQ|NOR","COD|POR","CRO|ENG","CZE|RSA","BIH|SUI","AUS|USA","MAR|SCO","BRA|HAI",
+  "NED|SWE","CIV|GER","ESP|KSA","BEL|IRN","ARG|AUT","FRA|IRQ","POR|UZB","ENG|GHA","CAN|SUI","BRA|SCO",
+  "ECU|GER","NED|TUN","FRA|NOR","ESP|URU","ENG|PAN","COL|POR"]);
+// Renvoie la liste des chaînes pour un match.
+function channelsFor(m){
+  const ch=["bein"]; // toujours beIN
+  const a=teamCode(m.homeTeam), b=teamCode(m.awayTeam);
+  if(m.stage==="GROUP_STAGE"){
+    if(a&&b && M6_GROUP.has([a,b].sort().join("|")))ch.unshift("m6");
+  }else if(m.stage){
+    // phases finales : M6 sur la France, les demies, la 3e place et la finale
+    const fr=(a==="FRA"||b==="FRA");
+    if(fr||m.stage==="SEMI_FINALS"||m.stage==="THIRD_PLACE"||m.stage==="FINAL")ch.unshift("m6");
+  }
+  return ch;
+}
+function channelBadges(m){
+  return `<span class="chan">📺 `+channelsFor(m).map(c=>c==="m6"?`<b class="m6">M6</b>`:`<b class="bein">beIN</b>`).join(" ")+`</span>`;
+}
+// Boutons ★ watchlist + agenda (seulement si les deux équipes sont connues).
+function matchActions(m){
+  const id=String(m.id);
+  if(!(m.homeTeam&&m.homeTeam.name&&m.awayTeam&&m.awayTeam.name))return "";
+  return `<button class="iconbtn star sm ${isWatched(id)?'on':''}" title="Ma watchlist" onclick="toggleWatch('${id}')">${isWatched(id)?'★':'☆'}</button>
+    <button class="iconbtn cal sm" title="Ajouter à mon agenda" onclick="openCal('${id}')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button>`;
+}
+
 // Ligne d'un match de poule (avec champs de prono ou score réel).
 function matchPronoRow(m){
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
@@ -1682,7 +1595,9 @@ function matchPronoRow(m){
     <div class="pside">${home.flag}<span class="nm">${home.name}</span></div>
     ${middle}
     <div class="pside r">${away.flag}<span class="nm">${away.name}</span></div>
-    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)} <span class="pstat" id="pstat-${id}"></span></div>
+    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)} ${channelBadges(m)}
+      <span class="pstat" id="pstat-${id}"></span>
+      <span class="pacts">${matchActions(m)}</span></div>
   </div>`;
 }
 // Ligne d'un match de phase finale (équipes possiblement inconnues, pas de prono pour l'instant).
@@ -1697,7 +1612,8 @@ function finalRow(m){
     <div class="pside">${home.flag}<span class="nm">${home.name}</span></div>
     ${middle}
     <div class="pside r">${away.flag}<span class="nm">${away.name}</span></div>
-    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)}</div>
+    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)} ${channelBadges(m)}
+      <span class="pacts">${matchActions(m)}</span></div>
   </div>`;
 }
 
