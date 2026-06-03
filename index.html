@@ -553,6 +553,7 @@ footer b{color:var(--muted)}
       <button class="tab on" data-v="matchs">⚽ Matchs</button>
       <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge">0</span></button>
       <button class="tab" data-v="pronos">🎯 Pronos</button>
+      <button class="tab" data-v="classement">🏆 Classement</button>
       <button class="tab" data-v="groupes">🗂️ Groupes</button>
       <button class="tab" data-v="infos">📰 Infos</button>
     </div>
@@ -702,6 +703,8 @@ let state={
   profile:store.get("cm26_profile",null), // { id, pseudo }
   orgas:store.get("cm26_orgas",[]),       // [ { id, nom, code } ]
   tournoi:store.get("cm26_tournoi",null), // { champion, top_scorer, best_player }
+  lbScope:"general",                      // classement : "general" | "orga"
+  lbOrga:null,                            // id de l'orga sélectionnée pour le classement
   watch:store.get("tifo_watch",[]),
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
@@ -722,7 +725,7 @@ const FRIENDS=[
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={matchs:"Matchs",watchlist:"Ma watchlist",pronos:"Pronos",groupes:"Groupes",infos:"Infos"};
+const TAB_LABELS={matchs:"Matchs",watchlist:"Ma watchlist",pronos:"Pronos",classement:"Classement",groupes:"Groupes",infos:"Infos"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -790,7 +793,7 @@ function drawLogin(){
     <p class="msub">Connecte-toi pour jouer au concours de pronos et synchroniser ta watchlist. Naviguer reste libre.</p>
     <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
 }
-function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À plus 👋")}
+function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;lbCache=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À plus 👋")}
 
 /* ============================================================
    CONNEXION GOOGLE via SUPABASE
@@ -826,7 +829,7 @@ function applySupabaseSession(session){
   }else{
     state.user=null; state.profile=null; state.orgas=[]; state.tournoi=null;
     store.set("tifo_user",null); store.set("cm26_profile",null); store.set("cm26_orgas",[]); store.set("cm26_tournoi",null);
-    loadedUserId=null;
+    loadedUserId=null; lbCache=null;
     renderAuth();render();
   }
 }
@@ -983,7 +986,7 @@ async function createOrga(){
   const {error:mErr}=await supabase
     .from("orga_members").insert({orga_id:orga.id,user_id:state.user.id});
   if(mErr){toast("Orga créée, mais adhésion échouée : "+mErr.message)}
-  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas);
+  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas); lbCache=null;
   renderAuth();
   onbCreatedCode=orga.code; onbStep="created"; drawOnboarding();
 }
@@ -1000,7 +1003,7 @@ async function joinOrga(){
   const {error:mErr}=await supabase
     .from("orga_members").insert({orga_id:orga.id,user_id:state.user.id});
   if(mErr){toast("Impossible de rejoindre : "+mErr.message);return}
-  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas);
+  state.orgas=[...(state.orgas||[]),orga]; store.set("cm26_orgas",state.orgas); lbCache=null;
   toast("Bienvenue dans "+orga.nom+" 🎉");
   finishOnboarding();
 }
@@ -1042,6 +1045,7 @@ function render(){
   if(state.view==="matchs")return renderMatches();
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
+  if(state.view==="classement")return renderClassement();
   if(state.view==="groupes")return renderGroups();
   if(state.view==="infos")return renderInfos();
 }
@@ -1367,7 +1371,171 @@ async function saveTournament(){
   if(error){toast("Enregistrement impossible : "+error.message);return}
   state.tournoi={champion,top_scorer,best_player};
   store.set("cm26_tournoi",state.tournoi);
+  lbCache=null; // le classement devra se recalculer
   toast("Pronos de tournoi enregistrés ✓");
+}
+
+/* ============================================================
+   CLASSEMENT (Général + Mon orga) — calcul des points
+============================================================ */
+// Valeurs réelles du tournoi : à remplir à la FIN du Mondial.
+// Tant qu'elles sont null -> 0 pt pour la partie "tournoi".
+const REAL_CHAMPION=null, REAL_TOP_SCORER=null, REAL_BEST_PLAYER=null;
+
+// Barème : matchs (3 exact / 1 bon résultat) + bonus tournoi (15/10/10).
+function computePoints(matchPreds, resultsByMatch, tourPred){
+  let pts=0;
+  (matchPreds||[]).forEach(p=>{
+    const r=resultsByMatch[p.match_id];
+    if(!r)return; // pas de résultat "finished" -> on ignore
+    const ph=p.pred_home, pa=p.pred_away, rh=r.real_home, ra=r.real_away;
+    if(ph==null||pa==null||rh==null||ra==null)return;
+    if(ph===rh && pa===ra){pts+=3}                                   // score exact
+    else if(Math.sign(ph-pa)===Math.sign(rh-ra)){pts+=1}             // bon résultat (1/N/2)
+  });
+  if(tourPred){
+    if(REAL_CHAMPION && tourPred.champion===REAL_CHAMPION)pts+=15;
+    if(REAL_TOP_SCORER && tourPred.top_scorer===REAL_TOP_SCORER)pts+=10;
+    if(REAL_BEST_PLAYER && tourPred.best_player===REAL_BEST_PLAYER)pts+=10;
+  }
+  return pts;
+}
+
+let lbCache=null;     // { profiles, pointsByUser, membersByOrga }
+let lbLoading=false;
+
+// Charge TOUTES les données en quelques requêtes groupées, puis calcule côté client.
+async function loadLeaderboard(){
+  if(!supabase||lbLoading)return;
+  lbLoading=true;
+  try{
+    const orgaIds=(state.orgas||[]).map(o=>o.id);
+    const memQ=orgaIds.length
+      ? supabase.from("orga_members").select("orga_id,user_id").in("orga_id",orgaIds)
+      : Promise.resolve({data:[],error:null});
+    const [pf,mp,mr,tp,mem]=await Promise.all([
+      supabase.from("profiles").select("id,pseudo"),
+      supabase.from("match_predictions").select("user_id,match_id,pred_home,pred_away"),
+      supabase.from("match_results").select("match_id,real_home,real_away,status"),
+      supabase.from("tournament_predictions").select("user_id,champion,top_scorer,best_player"),
+      memQ
+    ]);
+    const err=pf.error||mp.error||mr.error||tp.error||mem.error;
+    if(err){
+      toast("Erreur de chargement du classement : "+err.message);
+      lbCache={profiles:[],pointsByUser:{},membersByOrga:{}}; // évite une boucle de réessais
+      return;
+    }
+
+    const results={};
+    (mr.data||[]).forEach(r=>{if(r.status==="finished")results[r.match_id]=r});
+    const matchByUser={};
+    (mp.data||[]).forEach(p=>{(matchByUser[p.user_id]=matchByUser[p.user_id]||[]).push(p)});
+    const tourByUser={};
+    (tp.data||[]).forEach(t=>{tourByUser[t.user_id]=t});
+    const pointsByUser={};
+    (pf.data||[]).forEach(prof=>{
+      pointsByUser[prof.id]=computePoints(matchByUser[prof.id]||[], results, tourByUser[prof.id]||null);
+    });
+    const membersByOrga={};
+    (mem.data||[]).forEach(m=>{(membersByOrga[m.orga_id]=membersByOrga[m.orga_id]||new Set()).add(m.user_id)});
+
+    lbCache={profiles:pf.data||[], pointsByUser, membersByOrga};
+  }finally{
+    lbLoading=false;
+  }
+}
+function refreshLeaderboard(){lbCache=null;render()}
+function setLbScope(s){
+  state.lbScope=s;
+  if(s==="orga" && !state.lbOrga && (state.orgas||[]).length)state.lbOrga=state.orgas[0].id;
+  render();
+}
+function setLbOrga(id){state.lbOrga=id;render()}
+
+// Construit les lignes du tableau (triées par points puis pseudo).
+function lbRows(allowedIds){
+  const medals=["🥇","🥈","🥉"];
+  const list=(lbCache.profiles||[])
+    .filter(p=>!allowedIds || allowedIds.has(p.id))
+    .map(p=>({id:p.id, pseudo:p.pseudo||"—", pts:lbCache.pointsByUser[p.id]||0}))
+    .sort((a,b)=> b.pts-a.pts || a.pseudo.localeCompare(b.pseudo,"fr"));
+  if(!list.length)return `<p class="sub">Personne pour l'instant.</p>`;
+  return list.map((r,i)=>{
+    const me=state.user && r.id===state.user.id;
+    const rank=i<3?medals[i]:(i+1);
+    return `<div class="lead ${me?'me':''} ${i===0?'one':''}">
+      <div class="rk">${rank}</div><span class="nm">${r.pseudo}</span>
+      <span class="pts">${r.pts}<small> pts</small></span></div>`;
+  }).join("");
+}
+
+function renderClassement(){
+  const hero=`<div class="hero" style="padding:24px 26px">
+    <div class="kick">Le concours entre potes 🦅</div>
+    <h2 style="font-size:28px">Classement 🏆</h2>
+    <p>Score exact <b style="color:var(--red)">3 pts</b>, bon résultat <b style="color:var(--blue)">1 pt</b>. Bonus tournoi : champion <b>15</b>, meilleur buteur <b>10</b>, meilleur joueur <b>10</b>.</p>
+  </div>`;
+
+  if(!state.user){
+    view.innerHTML=hero+`<div class="gate">
+      <div class="lock">🔒</div>
+      <h3>Connecte-toi pour voir le classement</h3>
+      <p>Le concours est nominatif : connecte-toi pour apparaître au classement.</p>
+      <button class="authbtn" style="padding:11px 22px;font-size:14px" onclick="openLogin()">Se connecter</button>
+    </div>`;
+    return;
+  }
+
+  // Données pas encore chargées -> on lance le chargement une seule fois.
+  if(!lbCache){
+    if(supabase && !lbLoading)loadLeaderboard().then(()=>{if(state.view==="classement")render()});
+    view.innerHTML=hero+`<div class="panel"><p class="sub">Chargement du classement…</p></div>`;
+    return;
+  }
+
+  const scope=state.lbScope||"general";
+  const orgas=state.orgas||[];
+  if(scope==="orga" && !state.lbOrga && orgas.length)state.lbOrga=orgas[0].id;
+
+  const scopeTabs=`<div style="display:flex;gap:8px;margin-bottom:6px">
+    <button class="chip ${scope==='general'?'on':''}" onclick="setLbScope('general')">Général</button>
+    <button class="chip ${scope==='orga'?'on':''}" onclick="setLbScope('orga')">Mon orga</button>
+  </div>`;
+
+  let orgaSelector="";
+  if(scope==="orga" && orgas.length>1){
+    orgaSelector=`<div class="field" style="margin:10px 0 0">
+      <select onchange="setLbOrga(this.value)">
+        ${orgas.map(o=>`<option value="${o.id}" ${o.id===state.lbOrga?"selected":""}>${escAttr(o.nom)}</option>`).join("")}
+      </select></div>`;
+  }
+
+  let body, note=`<p class="sub" style="margin-top:14px;color:var(--muted-2)">Le classement s'animera dès les premiers résultats 🏁</p>`;
+  if(scope==="orga" && !orgas.length){
+    body=`<div class="gate" style="padding:28px;margin-top:12px">
+      <div class="lock">🏷️</div>
+      <h3>Pas encore d'orga</h3>
+      <p>Rejoins une orga pour voir le classement de ton groupe.</p>
+      <button class="authbtn" style="padding:11px 22px;font-size:14px" onclick="openOrgaManager()">➕ Créer ou rejoindre une orga</button>
+    </div>`;
+    note="";
+  }else if(scope==="orga"){
+    const allowed=(lbCache.membersByOrga&&lbCache.membersByOrga[state.lbOrga])||new Set();
+    body=`<div style="margin-top:12px">${lbRows(allowed)}</div>`;
+  }else{
+    body=`<div style="margin-top:12px">${lbRows(null)}</div>`;
+  }
+
+  view.innerHTML=hero+`<div class="panel">
+    <h3>Classement</h3>
+    <p class="sub">${scope==="orga"?"Entre membres de ton orga":"Tous les joueurs CM26"}</p>
+    ${scopeTabs}
+    ${orgaSelector}
+    ${body}
+    ${note}
+    <button class="chip" style="margin-top:16px" onclick="refreshLeaderboard()">↻ Rafraîchir</button>
+  </div>`;
 }
 
 function renderPronos(){
