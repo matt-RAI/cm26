@@ -1641,18 +1641,21 @@ function finalRow(m){
   </div>`;
 }
 
-/* ---- Filtres des pronos de match (journée / heure / équipe) ---- */
-let pronoFilter={jour:"all", heure:"all", team:""};
+/* ---- Filtres des pronos de match (journée / date / heure / équipe) ---- */
+let pronoFilter={jour:"all", date:"all", heure:"all", team:""};
 function setPronoFilter(k,v){
   pronoFilter[k]=v;
   render();
   if(k==="team"){const el=document.getElementById("pronoTeam");if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
 }
-function resetPronoFilter(){pronoFilter={jour:"all",heure:"all",team:""};render()}
+function resetPronoFilter(){pronoFilter={jour:"all",date:"all",heure:"all",team:""};render()}
 // normalise (minuscules + sans accents) pour une recherche tolérante
 function norm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")}
 // heure de Paris "HH:MM" d'un match
 function parisHour(m){try{return new Date(m.utcDate).toLocaleTimeString("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"})}catch(e){return""}}
+// date de Paris : clé stable "AAAA-MM-JJ" + libellé lisible "Sam. 13 juin"
+function parisDateKey(m){try{return new Date(m.utcDate).toLocaleDateString("en-CA",{timeZone:"Europe/Paris"})}catch(e){return""}}
+function parisDateLabel(m){try{const s=new Date(m.utcDate).toLocaleDateString("fr-FR",{timeZone:"Europe/Paris",weekday:"short",day:"numeric",month:"short"});return s.charAt(0).toUpperCase()+s.slice(1)}catch(e){return""}}
 // liste d'autocomplétion (noms FR des équipes présentes)
 function teamDatalist(){
   const seen=new Set();let opts="";
@@ -1664,11 +1667,16 @@ function teamDatalist(){
 function pronoFilterBar(){
   const jours=[["all","Toutes"],["1","Journée 1"],["2","Journée 2"],["3","Journée 3"],["finale","Phase finale"]];
   const jourOpts=jours.map(([v,l])=>`<option value="${v}" ${pronoFilter.jour===v?"selected":""}>${l}</option>`).join("");
+  const dmap={};
+  (apiMatches||[]).forEach(m=>{const k=parisDateKey(m);if(k&&!dmap[k])dmap[k]=parisDateLabel(m)});
+  const dateKeys=Object.keys(dmap).sort();
+  const dateOpts=`<option value="all">Toutes</option>`+dateKeys.map(k=>`<option value="${k}" ${pronoFilter.date===k?"selected":""}>${dmap[k]}</option>`).join("");
   const hours=[...new Set((apiMatches||[]).map(parisHour).filter(Boolean))].sort();
   const hourOpts=`<option value="all">Toutes</option>`+hours.map(h=>`<option value="${h}" ${pronoFilter.heure===h?"selected":""}>${h}</option>`).join("");
-  const active=pronoFilter.jour!=="all"||pronoFilter.heure!=="all"||pronoFilter.team;
+  const active=pronoFilter.jour!=="all"||pronoFilter.date!=="all"||pronoFilter.heure!=="all"||pronoFilter.team;
   return `<div class="pfilters">
     <div class="field"><label>Journée</label><select onchange="setPronoFilter('jour',this.value)">${jourOpts}</select></div>
+    <div class="field"><label>Date</label><select onchange="setPronoFilter('date',this.value)">${dateOpts}</select></div>
     <div class="field"><label>Heure (Paris)</label><select onchange="setPronoFilter('heure',this.value)">${hourOpts}</select></div>
     <div class="field"><label>Équipe</label><input id="pronoTeam" list="teamlist" autocomplete="off" placeholder="ex. France, Brésil…" value="${escAttr(pronoFilter.team)}" oninput="setPronoFilter('team',this.value)"></div>
     ${active?`<button class="chip" style="align-self:center" onclick="resetPronoFilter()">✕ Réinitialiser</button>`:""}
@@ -1702,6 +1710,7 @@ function pronoMatchesHTML(){
   let finals=apiMatches.filter(m=>m.stage && m.stage!=="GROUP_STAGE");
   if(pronoFilter.jour==="finale"){groups=[]}
   else if(pronoFilter.jour!=="all"){groups=groups.filter(m=>(m.matchday||0)===+pronoFilter.jour);finals=[]}
+  if(pronoFilter.date!=="all"){groups=groups.filter(m=>parisDateKey(m)===pronoFilter.date);finals=finals.filter(m=>parisDateKey(m)===pronoFilter.date)}
   if(pronoFilter.heure!=="all"){groups=groups.filter(m=>parisHour(m)===pronoFilter.heure);finals=finals.filter(m=>parisHour(m)===pronoFilter.heure)}
   groups=groups.filter(teamMatch);finals=finals.filter(teamMatch);
 
