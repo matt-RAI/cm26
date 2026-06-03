@@ -701,7 +701,7 @@ let state={
   user:store.get("tifo_user",null),
   profile:store.get("cm26_profile",null), // { id, pseudo }
   orgas:store.get("cm26_orgas",[]),       // [ { id, nom, code } ]
-  tournoi:store.get("cm26_tournoi",null), // { champion, finalist, top_scorer, best_player }
+  tournoi:store.get("cm26_tournoi",null), // { champion, top_scorer, best_player }
   watch:store.get("tifo_watch",[]),
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
@@ -863,11 +863,11 @@ async function loadUserData(userId){
   renderAuth();render();
 }
 
-// Charge les pronos de tournoi (vainqueur, finaliste, buteur, joueur) de l'utilisateur.
+// Charge les pronos de tournoi (vainqueur, buteur, joueur) de l'utilisateur.
 async function loadTournamentPredictions(userId){
   const {data,error}=await supabase
     .from("tournament_predictions")
-    .select("champion,finalist,top_scorer,best_player").eq("user_id",userId).maybeSingle();
+    .select("champion,top_scorer,best_player").eq("user_id",userId).maybeSingle();
   if(error){toast("Erreur chargement des pronos de tournoi : "+error.message);return}
   state.tournoi=data||null;
   store.set("cm26_tournoi",state.tournoi);
@@ -1326,7 +1326,7 @@ function tournamentSectionHTML(){
   if(!state.user){
     return `<div class="panel" style="margin-bottom:18px">
       <h3>Mes pronos de tournoi 🏆</h3>
-      <p class="sub">Désigne le vainqueur, le finaliste, le meilleur buteur et le meilleur joueur du Mondial.</p>
+      <p class="sub">Désigne le vainqueur, le meilleur buteur et le meilleur joueur du Mondial.</p>
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Connecte-toi pour faire tes pronos.</p>
       <button class="authbtn" style="padding:10px 20px;font-size:14px" onclick="openLogin()">Se connecter</button>
     </div>`;
@@ -1344,8 +1344,6 @@ function tournamentSectionHTML(){
     <p class="sub">${status}</p>
     <div class="field"><label>🏆 Vainqueur</label>
       <select id="tChampion" ${dis}>${teamOptions(t.champion)}</select></div>
-    <div class="field"><label>🥈 Finaliste</label>
-      <select id="tFinalist" ${dis}>${teamOptions(t.finalist)}</select></div>
     <div class="field"><label>⚽ Meilleur buteur</label>
       <select id="tTopScorer" ${dis} onchange="toggleOther('tTopScorer')">${listOptions(TOP_SCORERS,t.top_scorer)}</select>
       <input id="tTopScorerOther" ${dis} placeholder="Nom du buteur" value="${tsCustom?escAttr(t.top_scorer):""}" style="margin-top:8px;display:${tsCustom?'block':'none'}"></div>
@@ -1360,14 +1358,14 @@ async function saveTournament(){
   if(!state.user){toast("Connecte-toi d'abord");return}
   if(tournamentLocked()){toast("Pronos verrouillés 🔒");return}
   const v=id=>{const e=document.getElementById(id);return e?e.value.trim():""};
-  const champion=v("tChampion"), finalist=v("tFinalist");
+  const champion=v("tChampion");
   let top_scorer=v("tTopScorer"); if(top_scorer==="__autre__")top_scorer=v("tTopScorerOther");
   let best_player=v("tBestPlayer"); if(best_player==="__autre__")best_player=v("tBestPlayerOther");
   const {error}=await supabase.from("tournament_predictions").upsert(
-    {user_id:state.user.id,champion,finalist,top_scorer,best_player,updated_at:new Date().toISOString()},
+    {user_id:state.user.id,champion,top_scorer,best_player,updated_at:new Date().toISOString()},
     {onConflict:"user_id"});
   if(error){toast("Enregistrement impossible : "+error.message);return}
-  state.tournoi={champion,finalist,top_scorer,best_player};
+  state.tournoi={champion,top_scorer,best_player};
   store.set("cm26_tournoi",state.tournoi);
   toast("Pronos de tournoi enregistrés ✓");
 }
