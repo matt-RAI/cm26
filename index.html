@@ -1425,6 +1425,24 @@ async function loadLeaderboard(){
   }
 }
 function refreshLeaderboard(){lbCache=null;render()}
+
+// Synchro auto des résultats : déclenche /api/sync-results (serveur écrit dans
+// match_results), puis rafraîchit le classement. "Fire and forget", anti-spam 5 min,
+// échec silencieux (l'app continue avec les données déjà en base).
+async function syncResults(){
+  try{
+    const last=+store.get("cm26_last_sync",0)||0;
+    if(Date.now()-last < 5*60*1000) return;     // pas plus d'1 fois / 5 min
+    store.set("cm26_last_sync",Date.now());
+    const res=await fetch("/api/sync-results");
+    if(!res.ok) return;
+    const data=await res.json().catch(()=>null);
+    if(!data || data.error) return;
+    // de nouveaux résultats peuvent avoir été écrits -> on recalcule le classement
+    lbCache=null;
+    if(state.view==="classement"){ await loadLeaderboard(); if(state.view==="classement") render(); }
+  }catch(e){ /* silencieux : l'app continue normalement */ }
+}
 function setLbScope(s){
   state.lbScope=s;
   if(s==="orga" && !state.lbOrga && (state.orgas||[]).length)state.lbOrga=state.orgas[0].id;
@@ -1450,6 +1468,7 @@ function lbRows(allowedIds){
 }
 
 function renderClassement(){
+  syncResults(); // synchro auto des résultats (anti-spam intégré, non bloquant)
   const hero=`<div class="hero" style="padding:24px 26px">
     <div class="kick">Le concours entre amis 🦅</div>
     <h2 style="font-size:28px">Classement 🏆</h2>
@@ -2186,6 +2205,7 @@ paintStars();
 renderAuth();
 render();
 initSupabaseAuth(); // vérifie la session Google et met à jour le header
+syncResults();      // synchro auto des résultats au chargement (non bloquant)
 </script>
 </body>
 </html>
