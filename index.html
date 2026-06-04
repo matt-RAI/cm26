@@ -2181,6 +2181,13 @@ paintStars();
 (function(){const lb=document.getElementById("ledbar");if(lb)lb.innerHTML=sponsorBannerHTML();})();
 // logo du site = la mascotte (dans la pastille du header)
 (function(){const c=document.getElementById("crest");if(c)c.innerHTML=EAGLE_SVG;})();
+// favicon (icône d'onglet) = la mascotte aussi
+(function(){
+  const link=document.createElement("link");
+  link.rel="icon"; link.type="image/svg+xml";
+  link.href="data:image/svg+xml,"+encodeURIComponent(EAGLE_SVG);
+  document.head.appendChild(link);
+})();
 
 renderAuth();
 render();
