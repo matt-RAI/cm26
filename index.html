@@ -396,6 +396,10 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .pstat.ok{color:var(--grass);font-weight:600}
 .pstat.err{color:var(--red)}
 .mdh{font-family:'Archivo';font-weight:700;font-size:14px;margin:18px 0 6px;color:var(--muted)}
+.secthead{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none}
+.secchev{display:flex;align-items:center;color:var(--muted);transition:transform .25s}
+.secchev.up{transform:rotate(180deg)}
+.secthead:hover .secchev{color:var(--paper)}
 .pfilters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px}
 .pfilters .field{margin-bottom:0;flex:1;min-width:140px}
 .savebtn{margin-top:16px;width:100%;background:var(--grass);color:#fff;border:none;border-radius:11px;
@@ -1296,14 +1300,20 @@ function toggleOther(id){
   if(on)other.focus();
 }
 
+let tournoiOpen=true; // encart "Mes pronos de tournoi" : ouvert par défaut
+function toggleTournoi(){tournoiOpen=!tournoiOpen;render()}
+function tournoiHead(){
+  const chev=`<span class="secchev ${tournoiOpen?'up':''}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>`;
+  return `<div class="secthead" onclick="toggleTournoi()"><h3 style="margin:0">Mes pronos de tournoi 🏆</h3>${chev}</div>`;
+}
 function tournamentSectionHTML(){
   // Pas connecté -> message + bouton de connexion, à la place des champs.
   if(!state.user){
     return `<div class="panel" style="margin-bottom:18px">
-      <h3>Mes pronos de tournoi 🏆</h3>
-      <p class="sub">Désigne le vainqueur, le meilleur buteur et le meilleur joueur du Mondial.</p>
+      ${tournoiHead()}
+      ${tournoiOpen?`<p class="sub" style="margin-top:10px">Désigne le vainqueur, le meilleur buteur et le meilleur joueur du Mondial.</p>
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Connecte-toi pour faire tes pronos.</p>
-      <button class="authbtn" style="padding:10px 20px;font-size:14px" onclick="openLogin()">Se connecter</button>
+      <button class="authbtn" style="padding:10px 20px;font-size:14px" onclick="openLogin()">Se connecter</button>`:""}
     </div>`;
   }
   const t=state.tournoi||{};
@@ -1315,8 +1325,8 @@ function tournamentSectionHTML(){
     ? `<span style="color:var(--red);font-weight:700">Pronos verrouillés 🔒</span>`
     : `Modifiable jusqu'au coup d'envoi (11 juin)${daysToKickoff()>0?` · J-${daysToKickoff()}`:""}`;
   return `<div class="panel" style="margin-bottom:18px">
-    <h3>Mes pronos de tournoi 🏆</h3>
-    <p class="sub">${status}</p>
+    ${tournoiHead()}
+    ${tournoiOpen?`<p class="sub" style="margin-top:10px">${status}</p>
     <div class="field"><label>🏆 Vainqueur</label>
       <select id="tChampion" ${dis}>${teamOptions(t.champion)}</select></div>
     <div class="field"><label>⚽ Meilleur buteur</label>
@@ -1325,7 +1335,7 @@ function tournamentSectionHTML(){
     <div class="field"><label>⭐ Meilleur joueur</label>
       <select id="tBestPlayer" ${dis} onchange="toggleOther('tBestPlayer')">${listOptions(BEST_PLAYERS,t.best_player)}</select>
       <input id="tBestPlayerOther" ${dis} placeholder="Nom du joueur" value="${bpCustom?escAttr(t.best_player):""}" style="margin-top:8px;display:${bpCustom?'block':'none'}"></div>
-    ${locked?"":`<button class="savebtn" onclick="saveTournament()">💾 Enregistrer mes pronos</button>`}
+    ${locked?"":`<button class="savebtn" onclick="saveTournament()">💾 Enregistrer mes pronos</button>`}`:""}
   </div>`;
 }
 
