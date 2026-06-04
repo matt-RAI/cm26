@@ -363,6 +363,19 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .empty{text-align:center;padding:70px 20px;color:var(--muted-2)}
 .empty .em{font-size:46px;margin-bottom:14px;opacity:.5}
 .empty h3{font-family:'Archivo';color:var(--paper);font-size:19px;margin-bottom:8px}
+/* Fresh News */
+.newsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:18px}
+.newscard{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  overflow:hidden;text-decoration:none;color:inherit;transition:transform .18s,border-color .18s,box-shadow .18s}
+.newscard:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 16px 34px -20px rgba(0,0,0,.7)}
+.newscard .nimg{height:150px;flex:none;background:linear-gradient(135deg,#0c1426,#16203a);background-size:cover;background-position:center}
+.newscard .nimg.nph{display:grid;place-items:center;font-size:38px;opacity:.45}
+.newscard .nbody{padding:14px 15px;display:flex;flex-direction:column;gap:8px;flex:1}
+.newscard .ntitle{font-family:'Archivo';font-weight:700;font-size:15px;line-height:1.25;letter-spacing:-.2px;color:var(--paper)}
+.newscard .nexc{font-size:13px;color:var(--muted);line-height:1.45;flex:1;margin:0}
+.newscard .nmeta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;font-size:11px}
+.newscard .nmeta .nsrc{color:var(--red);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.newscard .nmeta .ndate{color:var(--muted-2);font-family:'DM Mono'}
 
 /* ---------- GROUPS ---------- */
 .groupgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -639,6 +652,7 @@ footer b{color:var(--muted)}
       <button class="tab on" data-v="pronos">⚽ Matchs &amp; Pronos</button>
       <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge">0</span></button>
       <button class="tab" data-v="classement">🏆 Classement</button>
+      <button class="tab" data-v="news">📰 Fresh News</button>
       <button class="tab" data-v="groupes">🗂️ Groupes</button>
     </div>
   </nav>
@@ -766,7 +780,7 @@ function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",stat
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",groupes:"Groupes"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"Fresh News",groupes:"Groupes"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -1104,6 +1118,7 @@ function render(){
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
   if(state.view==="classement")return renderClassement();
+  if(state.view==="news")return renderNews();
   if(state.view==="groupes")return renderGroups();
 }
 
@@ -1962,6 +1977,80 @@ function setPronoStatus(id,kind){
   }
   else if(kind==="error"){el.textContent="⚠️";el.className="pstat err";}
   else {el.textContent="";el.className="pstat";}
+}
+
+/* ============================================================
+   FRESH NEWS — actus foot (RSS) via /api/news, spécial Mondial
+============================================================ */
+let newsCache=null, newsTs=0, newsError=null, newsLoading=false;
+(function(){ const c=store.get("cm26_news",null); if(c && c.ts && Array.isArray(c.items)){ newsCache=c.items; newsTs=c.ts; } })();
+
+async function loadNews(force){
+  if(newsLoading)return;
+  if(!force && newsCache && (Date.now()-newsTs)<10*60*1000)return; // cache 10 min
+  newsLoading=true;
+  try{
+    const res=await fetch("/api/news");
+    if(!res.ok){ newsError="Service indisponible ("+res.status+")."; return; }
+    const data=await res.json().catch(()=>null);
+    newsCache=Array.isArray(data)?data:[];
+    newsTs=Date.now(); newsError=null;
+    store.set("cm26_news",{ts:newsTs,items:newsCache});
+  }catch(e){ newsError="Hors ligne ou service indisponible."; }
+  finally{ newsLoading=false; }
+}
+function ensureNews(){
+  if(newsLoading || newsError)return;
+  if(!newsCache || (Date.now()-newsTs)>=10*60*1000) loadNews().then(()=>{ if(state.view==="news")render(); });
+}
+function reloadNews(){ newsError=null; loadNews(true).then(()=>render()); }
+
+function newsRelDate(iso){
+  if(!iso)return "";
+  const d=new Date(iso); if(isNaN(d.getTime()))return "";
+  const min=Math.floor((Date.now()-d.getTime())/60000);
+  if(min<1)return "à l'instant";
+  if(min<60)return "il y a "+min+" min";
+  const h=Math.floor(min/60); if(h<24)return "il y a "+h+" h";
+  const j=Math.floor(h/24); if(j<7)return "il y a "+j+" j";
+  return d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+}
+function newsCard(n){
+  const img = n.image
+    ? `<div class="nimg" style="background-image:url('${escAttr(n.image)}')"></div>`
+    : `<div class="nimg nph">📰</div>`;
+  return `<a class="newscard" href="${escAttr(n.link)}" target="_blank" rel="noopener">
+    ${img}
+    <div class="nbody">
+      <h4 class="ntitle">${escapeHtml(n.title||"")}</h4>
+      ${n.excerpt?`<p class="nexc">${escapeHtml(n.excerpt)}</p>`:`<p class="nexc"></p>`}
+      <div class="nmeta"><span class="nsrc">${escapeHtml(n.source||"")}</span><span class="ndate">${newsRelDate(n.date)}</span></div>
+    </div>
+  </a>`;
+}
+function renderNews(){
+  ensureNews();
+  const hero=`<div class="hero" style="padding:24px 26px">
+    <div class="kick">Le fil Coupe du Monde 📰</div>
+    <h2 style="font-size:28px">Fresh News</h2>
+    <p>L'actu foot spéciale Mondial 2026, agrégée depuis la presse. Clique pour lire l'article complet sur le site source.</p>
+  </div>`;
+  if(!newsCache){
+    if(newsError){
+      view.innerHTML=hero+`<div class="empty"><div class="em">⚠️</div><h3>Impossible de charger les actus</h3>
+        <p>${escapeHtml(newsError)}</p>
+        <button class="chip" style="margin-top:10px" onclick="reloadNews()">↻ Réessayer</button></div>`;
+    }else{
+      view.innerHTML=hero+`<p class="sub">Chargement des actus…</p>`;
+    }
+    return;
+  }
+  if(!newsCache.length){
+    view.innerHTML=hero+emptyState("📰","Pas encore d'actu Coupe du Monde","Ça va chauffer dès le coup d'envoi ⚽");
+    return;
+  }
+  const banner=newsError?`<p class="sub" style="color:var(--red)">⚠️ Mise à jour impossible — affichage du cache. <a href="#" onclick="reloadNews();return false">Réessayer</a></p>`:"";
+  view.innerHTML=hero+banner+`<div class="newsgrid">${newsCache.map(newsCard).join("")}</div>`;
 }
 
 /* ---------- GROUPES ---------- */
