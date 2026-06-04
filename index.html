@@ -1177,12 +1177,12 @@ function drawCal(){
     <div class="field">
       <label>Inviter des amis (e-mails séparés par des virgules)</label>
       <input id="guests" inputmode="email" autocapitalize="off" placeholder="momo@boite.com, greg@autreboite.fr">
-      <div class="hint">Ils reçoivent une vraie invitation calendrier — discrète si le mode est activé.</div>
+      <div class="hint">Ils reçoivent un vrai e-mail avec l'invitation (.ics) en pièce jointe.<br><b style="color:var(--gold)">En test : l'envoi ne fonctionne que vers ta propre adresse pour l'instant.</b></div>
     </div>
     <div class="calbtns">
       <a class="calbtn" id="gcalBtn" target="_blank" rel="noopener">📆 Google Agenda</a>
       <button class="calbtn" onclick="downloadICS(false)">⬇️ Fichier .ics</button>
-      <button class="calbtn full" onclick="downloadICS(true)">✉️ Inviter mes amis + télécharger</button>
+      <button class="calbtn full" onclick="sendInvites()">✉️ Envoyer l'invitation par e-mail</button>
     </div>`;
   refreshGcalLink();
 }
@@ -1243,6 +1243,51 @@ function downloadICS(withGuests){
   a.download=(calCtx.id==="ALL"?"ma-watchlist-mondial26":"match-mondial26")+".ics";a.click();
   closeCal();
   toast(guests.length?`Invitation prête pour ${guests.length} ami${guests.length>1?'s':''} ✉️`:"Ajouté à ton agenda 📅");
+}
+
+// Envoi RÉEL de l'invitation par e-mail (via /api/invite -> Resend), + téléchargement du .ics.
+async function sendInvites(){
+  const el=document.getElementById("guests");
+  const emails=(el?el.value:"").split(",").map(s=>s.trim()).filter(Boolean);
+  // champ vide -> on télécharge juste le .ics (comportement d'avant)
+  if(!emails.length){ downloadICS(false); return; }
+  const valid=emails.filter(e=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  if(!valid.length){ toast("E-mail invalide"); return; }
+
+  const m=apiMatchById(calCtx.id);
+  if(!m){ toast("Match introuvable"); return; }
+  const ics=buildICS([m],valid);
+
+  // on télécharge AUSSI le .ics localement (comme avant)
+  try{
+    const blob=new Blob([ics],{type:"text/calendar"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="match-mondial26.ics";a.click();
+  }catch(e){}
+
+  // petit e-mail HTML
+  const title=eventTitle(m), when=fmtParis(m.utcDate);
+  const chans=channelsFor(m).map(c=>c==="m6"?"M6":"beIN Sports").join(" / ");
+  const html=`<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:auto;color:#0a1733">
+      <h2 style="color:#ef2b3d;margin:0 0 8px">⚽ ${escapeHtml(title)}</h2>
+      <p style="margin:4px 0;font-size:15px">🗓️ <b>${escapeHtml(when)}</b> (heure de Paris)</p>
+      <p style="margin:4px 0;font-size:15px">📺 ${escapeHtml(chans)}</p>
+      <p style="margin:14px 0;font-size:15px">Ajoute-le à ton agenda 🗓️ — le fichier <b>.ics</b> est en pièce jointe (Gmail, Outlook, Apple).</p>
+      <p style="margin:18px 0 0;font-size:12px;color:#6f87b6">Envoyé via CM26 — Le QG du Mondial 🦅</p>
+    </div>`;
+  const subject=`${title} — on regarde ensemble ?`;
+  const icsB64=btoa(unescape(encodeURIComponent(ics))); // base64 UTF-8 du .ics
+
+  toast("Envoi en cours…");
+  try{
+    const res=await fetch("/api/invite",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({to:valid,subject,html,icsContent:icsB64,matchLabel:title})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.error){ toast("Envoi impossible : "+(data.error||("erreur "+res.status))); return; }
+    toast(`Invitation envoyée à ${valid.length} ami${valid.length>1?'s':''} ✉️✅`);
+    closeCal();
+  }catch(e){
+    toast("Envoi impossible (réseau ou serveur).");
+  }
 }
 function exportAll(){calCtx={id:"ALL",discreet:false,dn:DISCREET[0]};
   document.getElementById("calOverlay").classList.add("on");
