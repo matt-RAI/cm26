@@ -95,7 +95,10 @@ header{position:relative;z-index:30;padding:22px 0 14px}
   position:relative;overflow:hidden;transition:transform .25s cubic-bezier(.2,.8,.2,1);padding-bottom:11px;
 }
 .brand:hover .crest{transform:rotate(-5deg) scale(1.06)}
-.crest::after{content:"";position:absolute;left:0;right:0;bottom:0;height:13px;background:repeating-linear-gradient(90deg,var(--red) 0 5px,#fff 5px 10px)}
+.crest::after{content:"";position:absolute;left:0;right:0;bottom:0;height:13px;background:repeating-linear-gradient(90deg,var(--red) 0 5px,#fff 5px 10px);z-index:1}
+.crest svg{height:34px;width:auto;display:block;position:relative;z-index:2}
+.titlemascot{display:inline-block;height:.92em;width:auto;vertical-align:-.14em}
+.titlemascot svg{height:100%;width:auto;display:inline-block}
 .brand h1{font-family:'Anton';font-weight:400;font-size:25px;letter-spacing:.5px;line-height:1}
 .brand h1 span{color:var(--red)}
 .brand small{display:block;color:var(--muted-2);font-size:10.5px;letter-spacing:1px;margin-top:4px;font-weight:600;text-transform:uppercase}
@@ -537,6 +540,7 @@ footer b{color:var(--muted)}
   .bar{gap:10px}
   .brand{gap:10px}
   .crest{width:40px;height:40px;font-size:10px}
+  .crest svg{height:29px}
   .brand h1{font-size:22px}
   .brand small{display:none}
   .countdown{display:none}
@@ -610,7 +614,7 @@ footer b{color:var(--muted)}
   <header>
     <div class="bar">
       <div class="brand" onclick="go('pronos')">
-        <div class="crest">26</div>
+        <div class="crest" id="crest"></div>
         <div>
           <h1>CM<span>26</span></h1>
           <small>The Greatest Show 🦅</small>
@@ -1806,7 +1810,7 @@ function heroWelcomeHTML(){
   return `<div class="hero hero-welcome">
     <button class="hero-x" onclick="dismissHero()" title="J'ai compris">✕</button>
     <div class="kick">Bienvenue 🇺🇸 🇲🇽 🇨🇦</div>
-    <h2 style="font-size:clamp(30px,5vw,46px)">Le QG du Mondial 🦅</h2>
+    <h2 style="font-size:clamp(30px,5vw,46px)">Le QG du Mondial <span class="titlemascot">${EAGLE_SVG}</span></h2>
     <p>Suis tous les matchs, pronostique les scores, ajoute-les à ton agenda et compare-toi à tes amis.</p>
     <div class="herofeats">
       <div class="hf"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">Les 104 matchs, à l'heure de Paris, avec la chaîne TV</span></div>
@@ -2175,6 +2179,8 @@ paintStars();
 
 // bandeau LED fixe en bas (contenu statique, rendu une seule fois)
 (function(){const lb=document.getElementById("ledbar");if(lb)lb.innerHTML=sponsorBannerHTML();})();
+// logo du site = la mascotte (dans la pastille du header)
+(function(){const c=document.getElementById("crest");if(c)c.innerHTML=EAGLE_SVG;})();
 
 renderAuth();
 render();
