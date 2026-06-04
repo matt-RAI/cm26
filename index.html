@@ -653,9 +653,9 @@ footer b{color:var(--muted)}
     </div>
     <div class="tabs" id="tabs">
       <button class="tab on" data-v="pronos">⚽ Matchs &amp; Pronos</button>
-      <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge">0</span></button>
       <button class="tab" data-v="classement">🏆 Classement</button>
       <button class="tab" data-v="news">📰 Fresh News</button>
+      <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge" style="display:none">0</span></button>
       <button class="tab" data-v="groupes">🗂️ Groupes</button>
     </div>
   </nav>
@@ -1117,7 +1117,8 @@ function fmtDay(d){
 }
 
 function render(){
-  document.getElementById("wlBadge").textContent=state.watch.length;
+  const wl=document.getElementById("wlBadge");
+  if(wl){const n=state.watch.length; wl.textContent=n; wl.style.display=n>0?"":"none";} // badge masqué si vide
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
   if(state.view==="classement")return renderClassement();
