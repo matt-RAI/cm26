@@ -1267,12 +1267,14 @@ async function sendInvites(){
   // petit e-mail HTML
   const title=eventTitle(m), when=fmtParis(m.utcDate);
   const chans=channelsFor(m).map(c=>c==="m6"?"M6":"beIN Sports").join(" / ");
+  const eagleMini=EAGLE_SVG.replace('<svg ','<svg width="40" height="45" ');
   const html=`<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:auto;color:#0a1733">
-      <h2 style="color:#ef2b3d;margin:0 0 8px">⚽ ${escapeHtml(title)}</h2>
+      <div style="text-align:center;margin-bottom:6px">${eagleMini}</div>
+      <h2 style="color:#ef2b3d;margin:0 0 8px;text-align:center">⚽ ${escapeHtml(title)}</h2>
       <p style="margin:4px 0;font-size:15px">🗓️ <b>${escapeHtml(when)}</b> (heure de Paris)</p>
       <p style="margin:4px 0;font-size:15px">📺 ${escapeHtml(chans)}</p>
       <p style="margin:14px 0;font-size:15px">Ajoute-le à ton agenda 🗓️ — le fichier <b>.ics</b> est en pièce jointe (Gmail, Outlook, Apple).</p>
-      <p style="margin:18px 0 0;font-size:12px;color:#6f87b6">Envoyé via CM26 — Le QG du Mondial 🦅</p>
+      <p style="margin:18px 0 0;font-size:12px;color:#6f87b6">Envoyé via CM26 — Le QG du Mondial</p>
     </div>`;
   const subject=`${title} — on regarde ensemble ?`;
   const icsB64=btoa(unescape(encodeURIComponent(ics))); // base64 UTF-8 du .ics
