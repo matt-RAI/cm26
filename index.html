@@ -1365,10 +1365,11 @@ const REAL_CHAMPION=null, REAL_TOP_SCORER=null, REAL_BEST_PLAYER=null;
 function computePoints(matchPreds, resultsByMatch, tourPred){
   let pts=0;
   (matchPreds||[]).forEach(p=>{
-    const r=resultsByMatch[p.match_id];
-    if(!r)return; // pas de résultat "finished" -> on ignore
-    const ph=p.pred_home, pa=p.pred_away, rh=r.real_home, ra=r.real_away;
-    if(ph==null||pa==null||rh==null||ra==null)return;
+    const r=resultsByMatch[String(p.match_id)];                      // rapprochement par match_id (texte)
+    if(!r)return; // pas de résultat -> on ignore
+    if(p.pred_home==null||p.pred_away==null||r.real_home==null||r.real_away==null)return;
+    const ph=Number(p.pred_home), pa=Number(p.pred_away), rh=Number(r.real_home), ra=Number(r.real_away);
+    if(![ph,pa,rh,ra].every(Number.isFinite))return;                 // valeurs invalides -> on ignore
     if(ph===rh && pa===ra){pts+=3}                                   // score exact
     else if(Math.sign(ph-pa)===Math.sign(rh-ra)){pts+=1}             // bon résultat (1/N/2)
   });
@@ -1407,7 +1408,10 @@ async function loadLeaderboard(){
     }
 
     const results={};
-    (mr.data||[]).forEach(r=>{if(r.status==="finished")results[r.match_id]=r});
+    (mr.data||[]).forEach(r=>{
+      const done=(r.status && String(r.status).toUpperCase()==="FINISHED") || (r.real_home!=null && r.real_away!=null);
+      if(done) results[String(r.match_id)]=r;   // clé normalisée en texte
+    });
     const matchByUser={};
     (mp.data||[]).forEach(p=>{(matchByUser[p.user_id]=matchByUser[p.user_id]||[]).push(p)});
     const tourByUser={};
