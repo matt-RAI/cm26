@@ -1510,8 +1510,9 @@ function renderClassement(){
 }
 
 /* ============================================================
-   VRAIS MATCHS — API football-data.org via la fonction Netlify
-   /.netlify/functions/matches  (la clé reste côté serveur)
+   VRAIS MATCHS — API football-data.org via une fonction serveur
+   URL : /api/matches  (Cloudflare Pages ; redirigé aussi côté Netlify)
+   La clé secrète reste côté serveur, jamais dans le navigateur.
 ============================================================ */
 const API_TTL=5*60*1000; // 5 minutes de cache (quota gratuit limité)
 let apiMatches=null, apiMatchesTs=0, apiMatchesError=null, apiMatchesLoading=false;
@@ -1529,7 +1530,7 @@ async function loadApiMatches(force){
   if(!force && apiMatches && (Date.now()-apiMatchesTs)<API_TTL)return; // encore frais
   apiMatchesLoading=true;
   try{
-    const res=await fetch("/.netlify/functions/matches");
+    const res=await fetch("/api/matches");
     let data={}; try{data=await res.json()}catch(e){}
     if(!res.ok || (data && data.error)){
       apiMatchesError=(data&&(data.message||data.error))||("Erreur API ("+res.status+")");

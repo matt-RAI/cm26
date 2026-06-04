@@ -4,3 +4,11 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+
+# Le client appelle /api/matches (URL Cloudflare). Sur Netlify, on redirige
+# en interne (status 200 = proxy, pas de redirection visible) vers la fonction
+# Netlify existante, pour que le site reste fonctionnel pendant la transition.
+[[redirects]]
+  from = "/api/matches"
+  to = "/.netlify/functions/matches"
+  status = 200
