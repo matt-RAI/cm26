@@ -193,16 +193,16 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 @keyframes ledscrollanim{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .ledbanner:hover .ledtrack{animation-play-state:paused}
 .sponsor{display:flex;flex-direction:column;align-items:center;gap:7px;text-decoration:none;flex:none;margin-right:30px}
-.spcard{background:#fff;border-radius:12px;padding:9px 16px;min-width:120px;height:74px;
+.spcard{background:#fff;border-radius:12px;padding:9px 16px;width:150px;height:74px;
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 14px -4px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.35)}
-.spcard img{height:56px;width:auto;max-width:210px;object-fit:contain;display:block}
+.spcard img{height:56px;width:auto;max-width:100%;object-fit:contain;display:block}
 .spcard .spname{font-family:'Archivo';font-weight:800;font-size:18px;color:#0a1733}
 .sptag{font-family:'DM Mono';font-size:10.5px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;white-space:nowrap}
 @media(max-width:600px){
   .ledtrack{margin-left:16px;padding:9px 0}
   .sponsor{margin-right:20px;gap:5px}
-  .spcard{height:54px;min-width:90px;padding:7px 12px}
+  .spcard{height:54px;width:118px;padding:7px 12px}
   .spcard img{height:40px}
   .spcard .spname{font-size:15px}
   .ledlabel{font-size:9.5px;max-width:80px;padding:0 9px;letter-spacing:.6px}
@@ -216,10 +216,10 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .ledbar{position:fixed;left:0;right:0;bottom:0;z-index:90}
 .ledbar .ledbanner{margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;
   box-shadow:0 -10px 30px -16px rgba(0,0,0,.85)}
-.ledbar .spcard{height:56px;padding:7px 14px;min-width:104px}
+.ledbar .spcard{height:56px;padding:7px 14px;width:140px}
 .ledbar .spcard img{height:40px}
 @media(max-width:600px){
-  .ledbar .spcard{height:48px;min-width:84px;padding:6px 10px}
+  .ledbar .spcard{height:48px;width:104px;padding:6px 10px}
   .ledbar .spcard img{height:34px}
 }
 .eaglebtn{background:var(--panel);border:1px solid var(--line);border-radius:11px;width:38px;height:38px;
