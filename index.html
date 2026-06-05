@@ -724,7 +724,7 @@ footer b{color:var(--muted)}
       <button class="tab" data-v="classement">🏆 Classement</button>
       <span class="navsep" aria-hidden="true"></span>
       <span class="navgroup">Tournoi</span>
-      <button class="tab" data-v="news">📰 L'Actu</button>
+      <button class="tab" data-v="news">📰 News Fresh</button>
       <button class="tab" data-v="watchlist">★ Ma watchlist <span class="badge" id="wlBadge" style="display:none">0</span></button>
       <button class="tab" data-v="groupes">🗂️ Groupes &amp; Résultats</button>
     </div>
@@ -856,7 +856,7 @@ function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",stat
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"L'Actu",groupes:"Groupes & Résultats"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
