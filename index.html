@@ -1773,7 +1773,7 @@ async function loadApiMatches(force){
 function ensureApiMatches(){
   if(apiMatchesLoading || apiMatchesError)return;
   const stale=!apiMatches || (Date.now()-apiMatchesTs)>=API_TTL;
-  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos"||state.view==="watchlist")render()});
+  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos"||state.view==="watchlist"||state.view==="groupes")render()});
 }
 function reloadApiMatches(){apiMatchesError=null; loadApiMatches(true).then(()=>render())}
 
@@ -1963,7 +1963,8 @@ function pronoFilterBar(){
 }
 
 // Construit la liste des matchs (filtres + poules par journée + phase finale à part).
-function pronoMatchesHTML(){
+// Coeur commun : filtre + liste des matchs. rowFn = rendu d'une ligne de poule.
+function matchListHTML(rowFn, finalsNote){
   ensureApiMatches();
   if(!apiMatches){
     if(apiMatchesError){
@@ -2000,17 +2001,37 @@ function pronoMatchesHTML(){
   Object.keys(byDay).map(Number).sort((a,b)=>a-b).forEach(d=>{
     const ms=byDay[d].sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
     listed+=ms.length;
-    html+=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`+ms.map(matchPronoRow).join("");
+    html+=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`+ms.map(rowFn).join("");
   });
   if(finals.length){
     finals.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
     listed+=finals.length;
     html+=`<h4 class="mdh">Phase finale</h4>
-      <p class="sub" style="margin:-2px 0 8px">Équipes à déterminer · pronos de phase finale à venir.</p>`
+      <p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`
       +finals.map(finalRow).join("");
   }
   if(!listed)html+=emptyState("🔍","Aucun match","Aucun match ne correspond à tes filtres.");
   return html;
+}
+function pronoMatchesHTML(){ return matchListHTML(matchPronoRow, "Équipes à déterminer · pronos de phase finale à venir."); }
+function resultMatchesHTML(){ return matchListHTML(matchResultRow, "Équipes à déterminer."); }
+
+// Ligne RÉSULTAT (lecture seule) : score si joué, sinon "–". Pas de champ de prono.
+function matchResultRow(m){
+  const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
+  const id=String(m.id);
+  const sc=(m.score&&m.score.fullTime)||{};
+  const hasScore=sc.home!=null && sc.away!=null;
+  const middle=hasScore
+    ? `<div class="scorebox"><span class="sc">${sc.home}</span><span>–</span><span class="sc">${sc.away}</span></div>`
+    : `<div class="scorebox"><span style="color:var(--muted-2)">–</span></div>`;
+  return `<div class="prono">
+    <div class="pside">${home.flag}<span class="nm">${home.name}</span></div>
+    ${middle}
+    <div class="pside r">${away.flag}<span class="nm">${away.name}</span></div>
+    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)} ${channelBadges(m)}
+      <span class="pacts">${matchActions(m)}</span></div>
+  </div>`;
 }
 
 /* Hero de bienvenue repliable (etat memorise dans localStorage) */
@@ -2237,12 +2258,31 @@ function renderNews(){
 }
 
 /* ---------- GROUPES ---------- */
+let grpTab="groupes"; // sous-vue de l'onglet "Groupes & Résultats"
+function setGrpTab(v){grpTab=v;render()}
 function renderGroups(){
+  const sub=`<div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="chip ${grpTab==='groupes'?'on':''}" onclick="setGrpTab('groupes')">Groupes</button>
+    <button class="chip ${grpTab==='resultats'?'on':''}" onclick="setGrpTab('resultats')">Résultats</button>
+  </div>`;
+
+  // --- Sous-vue RÉSULTATS : tous les matchs de l'API (lecture seule) ---
+  if(grpTab==="resultats"){
+    const hero=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
+      <div class="kick">Tous les matchs · en direct & terminés</div>
+      <h2 style="font-size:28px">Résultats</h2>
+      <p>Les 104 matchs du Mondial : scores, statut et chaîne TV. Filtre par journée, date, heure, chaîne ou équipe.</p>
+    </div>`;
+    view.innerHTML=hero+sub+`<div class="panel">${resultMatchesHTML()}</div>`;
+    return;
+  }
+
+  // --- Sous-vue GROUPES (par défaut) ---
   let html=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
     <div class="kick">Tirage officiel · 5 décembre 2025</div>
     <h2 style="font-size:28px">Les 12 groupes</h2>
-    <p>Les 2 premiers de chaque poule + les 8 meilleurs 3<sup>es</sup> filent en 16<sup>es</sup>. 32 rescapés. Big stuff.</p>
-  </div><div class="groupgrid">`;
+    <p>Les 2 premiers de chaque poule + les 8 meilleurs 3<sup>es</sup> filent en 16<sup>es</sup>. 32 rescapés.</p>
+  </div>`+sub+`<div class="groupgrid">`;
   Object.keys(GROUPS).forEach((g,i)=>{
     html+=`<div class="gcard" style="animation-delay:${i*.03}s">
       <h4><span class="gl">${g}</span> Groupe ${g}</h4>
