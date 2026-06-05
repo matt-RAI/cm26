@@ -510,6 +510,9 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .adivider::before,.adivider::after{content:"";flex:1;height:1px;background:var(--line)}
 .gate{text-align:center;padding:34px 22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
 .gate .lock{font-size:42px;margin-bottom:14px}
+/* état verrouillé discret (ex. pronos de tournoi en vue déconnectée) */
+.locked-soft{opacity:.92}
+.lockline{display:flex;align-items:center;gap:7px;margin:6px 0 2px;color:var(--muted-2);font-size:13px;font-weight:600}
 .gate h3{font-family:'Archivo';font-size:20px;margin-bottom:8px}
 .gate p{color:var(--muted);font-size:14px;max-width:340px;margin:0 auto 18px}
 
@@ -1326,11 +1329,10 @@ function tournoiHead(){
 function tournamentSectionHTML(){
   // Pas connecté -> message + bouton de connexion, à la place des champs.
   if(!state.user){
-    return `<div class="panel" style="margin-bottom:18px">
+    return `<div class="panel locked-soft" style="margin-bottom:18px">
       ${tournoiHead()}
       ${tournoiOpen?`<p class="sub" style="margin-top:10px">Désigne le vainqueur, le meilleur buteur et le meilleur joueur du Mondial.</p>
-      <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">Connecte-toi pour faire tes pronos.</p>
-      <button class="authbtn" style="padding:10px 20px;font-size:14px" onclick="openLogin()">Se connecter</button>`:""}
+      <p class="lockline">🔒 Connecte-toi pour faire tes pronos de tournoi</p>`:""}
     </div>`;
   }
   const t=state.tournoi||{};
