@@ -627,6 +627,64 @@ footer b{color:var(--muted)}
   .odd{min-width:43px;padding:7px 7px}
 }
 @keyframes sheet{from{opacity:0;transform:translateY(46px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   BOUTON URGENCE + MODE TAF (work-mode) — apparence corporate sobre
+============================================================ */
+.panicbtn{display:inline-flex;align-items:center;gap:5px;background:var(--red);color:#fff;border:none;border-radius:999px;
+  padding:8px 14px;font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex:none;
+  box-shadow:0 4px 14px -6px rgba(239,43,61,.7);transition:transform .15s,background .15s}
+.panicbtn:hover{transform:translateY(-1px);background:#ff3b4d}
+.panicbtn .pb-work{display:none}
+@media(max-width:520px){.panicbtn{padding:7px 11px;font-size:12px}}
+
+/* --- variables corporate : recolore tout le site d'un coup --- */
+body.work-mode{
+  --ink:#f4f5f7; --ink-2:#eef1f5; --panel:#ffffff; --panel-2:#f6f8fa;
+  --line:#e3e6ea; --line-2:#d3d8df;
+  --paper:#33373d; --muted:#5b6270; --muted-2:#98a0ad;
+  --grass:#2d6cdf; --grass-deep:#2257c0; --grass-soft:rgba(45,108,223,.12);
+  --gold:#6b7280; --gold-soft:rgba(107,114,128,.12);
+  --red:#5b6270; --blue:#2d6cdf; --blue-soft:rgba(45,108,223,.12);
+  --shadow:0 6px 18px -12px rgba(0,0,0,.18);
+  background:#f4f5f7!important;color:#33373d;
+}
+/* masquer tout le décor festif */
+body.work-mode::before, body.work-mode::after{display:none!important}
+.work-mode .flagbar,.work-mode .stars-side,.work-mode .ledbar,.work-mode .resumay,
+.work-mode .hero-welcome,.work-mode .hero-collapsed,.work-mode .eaglebtn,.work-mode .countdown{display:none!important}
+/* heros -> panneau neutre */
+.work-mode .hero{background:#fff!important;border:1px solid #e3e6ea!important;box-shadow:none!important;color:#33373d!important;padding:18px 20px!important}
+.work-mode .hero::before,.work-mode .hero::after,.work-mode .hero .stripebar{display:none!important}
+.work-mode .hero h2{font-family:'Archivo',sans-serif!important;font-weight:800!important;text-transform:none!important;text-shadow:none!important;color:#33373d!important;font-size:20px!important;letter-spacing:0!important}
+.work-mode .hero .kick{color:#2d6cdf!important;letter-spacing:.4px}
+.work-mode .hero p,.work-mode .hero-meta span{color:#5b6270!important}
+.work-mode .hero-meta b{color:#33373d!important;font-family:'Archivo'!important}
+/* header / logo sobres */
+.work-mode header{border-bottom:1px solid #e3e6ea}
+.work-mode .brand h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:19px;color:#33373d;letter-spacing:0}
+.work-mode .brand h1 span{color:#2d6cdf}
+.work-mode .brand small{color:#98a0ad;letter-spacing:.4px}
+.work-mode .crest{background:#5b6270!important;box-shadow:none!important;border-radius:8px}
+.work-mode .crest::after{display:none!important}
+.work-mode .crest svg{display:none}
+/* onglet actif sobre */
+.work-mode .tabs{background:#fff;border-color:#e3e6ea}
+.work-mode .tab.on{background:#e8eef9;color:#2d6cdf}
+/* drapeaux & badges discrets */
+.work-mode .flag{filter:grayscale(1);opacity:.5}
+.work-mode .chan b{background:#e3e6ea!important;color:#6b7280!important}
+.work-mode .chan{color:#98a0ad!important}
+.work-mode .pbadge,.work-mode .pbadge.fin,.work-mode .pbadge.live{background:#eef1f5!important;color:#6b7280!important;border-color:#e3e6ea!important}
+/* news neutre */
+.work-mode .newscard .nimg{background:#eef1f5!important}
+.work-mode .newscard .nph-eagle svg,.work-mode .nph-paper{filter:grayscale(1) opacity(.55)}
+.work-mode .newscard .nmeta .nsrc{color:#5b6270!important}
+/* bouton Urgence -> état discret "Synced" */
+.work-mode .panicbtn{background:#eaeef4;color:#5b6270;border:1px solid #d3d8df;box-shadow:none;font-weight:600;font-size:12px;padding:6px 12px}
+.work-mode .panicbtn:hover{background:#e1e6ee;transform:none}
+.work-mode .panicbtn .pb-normal{display:none}
+.work-mode .panicbtn .pb-work{display:inline}
 </style>
 </head>
 <body>
@@ -644,6 +702,7 @@ footer b{color:var(--muted)}
         </div>
       </div>
       <div class="headright">
+        <button class="panicbtn" id="panicBtn" onclick="toggleWorkMode()" title="Patron en approche ?"><span class="pb-normal">🚨 Urgence</span><span class="pb-work">✓ Synced</span></button>
         <div class="countdown"><span class="live-dot"></span> Kickoff dans <b id="cd">—</b></div>
         <button class="eaglebtn" onclick="usaChant()" title="U-S-A! 🦅">🦅</button>
         <button class="eaglebtn hostbtn" onclick="mexFiesta()" title="¡Fiesta! 🌶️">🌶️</button>
@@ -802,10 +861,42 @@ function closeMenu(){
 function go(v){
   state.view=v;
   [...tabs.children].forEach(t=>t.classList.toggle("on",t.dataset.v===v));
-  const cur=document.getElementById("curTab"); if(cur) cur.textContent=TAB_LABELS[v]||"";
+  const cur=document.getElementById("curTab"); if(cur) cur.textContent=(workMode?WORK_TABS:TAB_LABELS)[v]||"";
   closeMenu();
   render();
   window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ============================================================
+   MODE TAF (Bouton Urgence) — apparence corporate, état NON mémorisé
+============================================================ */
+let workMode=false;
+const WORK_TABS={pronos:"Tâches", classement:"Performance", news:"Actualités secteur", watchlist:"Favoris", groupes:"Équipes"};
+function toggleWorkMode(){ setWorkMode(!workMode); }
+function setWorkMode(on){
+  workMode=on;
+  document.body.classList.toggle("work-mode",on);
+  // libellés des onglets (on garde data-v et le badge watchlist)
+  document.querySelectorAll('#tabs .tab').forEach(btn=>{
+    const v=btn.dataset.v;
+    if(on){
+      if(btn.dataset.orig===undefined) btn.dataset.orig=btn.innerHTML;
+      btn.innerHTML = v==="watchlist"
+        ? `${WORK_TABS[v]} <span class="badge" id="wlBadge" style="display:none">0</span>`
+        : (WORK_TABS[v]||btn.textContent);
+    }else if(btn.dataset.orig!==undefined){
+      btn.innerHTML=btn.dataset.orig;
+    }
+  });
+  // titre / sous-titre du header
+  const h1=document.querySelector('.brand h1'), sm=document.querySelector('.brand small');
+  if(h1){ if(on){ if(h1.dataset.orig===undefined)h1.dataset.orig=h1.innerHTML; h1.textContent="Projet Atlas"; }
+          else if(h1.dataset.orig!==undefined){ h1.innerHTML=h1.dataset.orig; } }
+  if(sm){ if(on){ if(sm.dataset.orig===undefined)sm.dataset.orig=sm.textContent; sm.textContent="Suivi d'activité — Q3"; }
+          else if(sm.dataset.orig!==undefined){ sm.textContent=sm.dataset.orig; } }
+  // libellé courant (mobile) + badge watchlist a jour
+  const cur=document.getElementById("curTab"); if(cur) cur.textContent=(on?WORK_TABS:TAB_LABELS)[state.view]||"";
+  const wl=document.getElementById("wlBadge"); if(wl){const n=state.watch.length; wl.textContent=n; wl.style.display=n>0?"":"none";}
 }
 
 /* ============================================================
