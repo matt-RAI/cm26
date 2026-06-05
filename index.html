@@ -327,8 +327,11 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .resumay .chev{color:#6f87b6;display:flex;align-items:center;transition:transform .25s}
 .resumay .chev.up{transform:rotate(180deg)}
 .resumay .sun{font-size:22px;line-height:1}
+.resumay .rmasc{display:inline-flex;align-items:center;flex:none}
+.resumay .rmasc svg{height:30px;width:auto;display:block}
 .resumay .rh h3{font-family:'Anton';font-weight:400;font-size:22px;text-transform:uppercase;letter-spacing:.5px}
 .resumay .by{font-size:10.5px;color:var(--red);font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.resumay .rdesc{font-size:12.5px;color:#39507e;line-height:1.45;margin:8px 0 0;font-weight:500}
 .resumay .refresh{background:none;border:1px solid #c9c3b0;color:#6f87b6;
   width:32px;height:32px;border-radius:9px;cursor:pointer;font-size:15px;transition:.15s;flex:none}
 .resumay .refresh:hover{border-color:var(--blue);color:var(--blue);transform:rotate(90deg)}
@@ -2230,24 +2233,26 @@ function toggleResumay(){state.resumayOpen=!state.resumayOpen;store.set("cm26_re
 function resumayHTML(){
   const open=state.resumayOpen;
   const chev=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+  const mascMini=EAGLE_SVG.replace('<svg ','<svg width="30" height="34" ');
   const head=`<div class="rh" onclick="toggleResumay()">
-      <span class="sun">☀️</span><h3>Morning Resumay</h3><span class="by">par l'Aigle</span>
+      <span class="rmasc">${mascMini}</span><h3>Morning Resumay</h3>
       <div class="rctl">
-        ${open?`<button class="refresh" onclick="event.stopPropagation();genResumay(true)" title="Nouvelle analyse de l'Aigle">↻</button>`:``}
+        ${open?`<button class="refresh" onclick="event.stopPropagation();genResumay(true)" title="Nouvelle capsule">↻</button>`:``}
         <span class="chev ${open?'up':''}">${chev}</span>
       </div></div>`;
-  if(!open) return `<div class="resumay collapsed">${head}</div>`;
+  const desc=`<p class="rdesc">Chaque matin, ta capsule Mondial : les résultats de la nuit, et les affiches du jour. ⚽</p>`;
+  if(!open) return `<div class="resumay collapsed">${head}${desc}</div>`;
   const txt = state.resumay ? state.resumay.text : SEED_PREVIEW;
   const bubble = state.resumayLoading
-    ? `<div class="rloading">L'Aigle s'échauffe…</div>`
+    ? `<div class="rloading">Ta capsule se prépare…</div>`
     : `<div class="rtext">${escapeHtml(txt)}</div>`;
   return `<div class="resumay">
     ${head}
+    ${desc}
     <div class="rbody">
       <div class="mascot">${EAGLE_SVG}</div>
       <div class="bubble">${bubble}</div>
     </div>
-    <div class="demo">★ En attendant le coup d'envoi (11 juin) — l'avant-tournoi vu par l'Aigle. *agrément non vérifié.</div>
   </div>`;
 }
 async function genResumay(force){
