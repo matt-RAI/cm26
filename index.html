@@ -1744,13 +1744,13 @@ function finalRow(m){
 }
 
 /* ---- Filtres des pronos de match (journée / date / heure / équipe) ---- */
-let pronoFilter={jour:"all", date:"all", heure:"all", team:""};
+let pronoFilter={jour:"all", date:"all", heure:"all", chaine:"all", team:""};
 function setPronoFilter(k,v){
   pronoFilter[k]=v;
   render();
   if(k==="team"){const el=document.getElementById("pronoTeam");if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
 }
-function resetPronoFilter(){pronoFilter={jour:"all",date:"all",heure:"all",team:""};render()}
+function resetPronoFilter(){pronoFilter={jour:"all",date:"all",heure:"all",chaine:"all",team:""};render()}
 // normalise (minuscules + sans accents) pour une recherche tolérante
 function norm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")}
 // heure de Paris "HH:MM" d'un match
@@ -1775,11 +1775,14 @@ function pronoFilterBar(){
   const dateOpts=`<option value="all">Toutes</option>`+dateKeys.map(k=>`<option value="${k}" ${pronoFilter.date===k?"selected":""}>${dmap[k]}</option>`).join("");
   const hours=[...new Set((apiMatches||[]).map(parisHour).filter(Boolean))].sort();
   const hourOpts=`<option value="all">Toutes</option>`+hours.map(h=>`<option value="${h}" ${pronoFilter.heure===h?"selected":""}>${h}</option>`).join("");
-  const active=pronoFilter.jour!=="all"||pronoFilter.date!=="all"||pronoFilter.heure!=="all"||pronoFilter.team;
+  const chaines=[["all","Toutes"],["m6","M6 (en clair)"],["bein","beIN Sports"]];
+  const chaineOpts=chaines.map(([v,l])=>`<option value="${v}" ${pronoFilter.chaine===v?"selected":""}>${l}</option>`).join("");
+  const active=pronoFilter.jour!=="all"||pronoFilter.date!=="all"||pronoFilter.heure!=="all"||pronoFilter.chaine!=="all"||pronoFilter.team;
   return `<div class="pfilters">
     <div class="field"><label>Journée</label><select onchange="setPronoFilter('jour',this.value)">${jourOpts}</select></div>
     <div class="field"><label>Date</label><select onchange="setPronoFilter('date',this.value)">${dateOpts}</select></div>
     <div class="field"><label>Heure (Paris)</label><select onchange="setPronoFilter('heure',this.value)">${hourOpts}</select></div>
+    <div class="field"><label>Chaîne TV</label><select onchange="setPronoFilter('chaine',this.value)">${chaineOpts}</select></div>
     <div class="field"><label>Équipe</label><input id="pronoTeam" list="teamlist" autocomplete="off" placeholder="ex. France, Brésil…" value="${escAttr(pronoFilter.team)}" oninput="setPronoFilter('team',this.value)"></div>
     ${active?`<button class="chip" style="align-self:center" onclick="resetPronoFilter()">✕ Réinitialiser</button>`:""}
     ${teamDatalist()}
@@ -1814,6 +1817,7 @@ function pronoMatchesHTML(){
   else if(pronoFilter.jour!=="all"){groups=groups.filter(m=>(m.matchday||0)===+pronoFilter.jour);finals=[]}
   if(pronoFilter.date!=="all"){groups=groups.filter(m=>parisDateKey(m)===pronoFilter.date);finals=finals.filter(m=>parisDateKey(m)===pronoFilter.date)}
   if(pronoFilter.heure!=="all"){groups=groups.filter(m=>parisHour(m)===pronoFilter.heure);finals=finals.filter(m=>parisHour(m)===pronoFilter.heure)}
+  if(pronoFilter.chaine!=="all"){const ch=m=>channelsFor(m).includes(pronoFilter.chaine);groups=groups.filter(ch);finals=finals.filter(ch)}
   groups=groups.filter(teamMatch);finals=finals.filter(teamMatch);
 
   let html=banner+pronoFilterBar();
