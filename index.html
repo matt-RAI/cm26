@@ -170,6 +170,7 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .herofeats .hf{flex:1;min-width:150px;display:flex;flex-direction:column;
   background:rgba(10,23,51,.05);border:1px solid rgba(10,23,51,.12);border-radius:12px;padding:11px 13px}
 .herofeats .hf-i{font-size:20px;line-height:1}
+.herofeats .hf-masc svg{height:22px;width:auto;display:block}
 .herofeats .hf b{font-family:'Archivo';font-weight:700;font-size:13.5px;color:#0a1733;margin-top:5px}
 .herofeats .hf-d{font-size:11.5px;color:#5a6b8c;line-height:1.35;margin-top:2px}
 @media(max-width:600px){.herofeats{display:grid;grid-template-columns:1fr 1fr;gap:10px}}
@@ -1852,6 +1853,7 @@ function heroWelcomeHTML(){
   if(store.get("cm26_hero_dismissed",false)){
     return `<button class="hero-collapsed" onclick="expandHero()">▸ À propos de CM26</button>`;
   }
+  const featMasc=EAGLE_SVG.replace('<svg ','<svg width="22" height="25" ');
   return `<div class="hero hero-welcome">
     <button class="hero-x" onclick="dismissHero()" title="J'ai compris">✕</button>
     <div class="kick">Bienvenue 🇺🇸 🇲🇽 🇨🇦</div>
@@ -1862,7 +1864,7 @@ function heroWelcomeHTML(){
       <div class="hf"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">Les matchs que tu ne veux pas manquer</span></div>
       <div class="hf"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">Un intitulé sobre dans ton agenda professionnel</span></div>
       <div class="hf"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">Pronostique et compare-toi au classement</span></div>
-      <div class="hf"><span class="hf-i">🦅</span><b>Morning Resumay</b><span class="hf-d">L'analyse d'avant-match de l'aigle</span></div>
+      <div class="hf"><span class="hf-i hf-masc">${featMasc}</span><b>Morning Resumay</b><span class="hf-d">Chaque matin : le récap de la nuit et les matchs du jour</span></div>
     </div>
   </div>`;
 }
