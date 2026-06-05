@@ -629,62 +629,57 @@ footer b{color:var(--muted)}
 @keyframes sheet{from{opacity:0;transform:translateY(46px)}to{opacity:1;transform:none}}
 
 /* ============================================================
-   BOUTON URGENCE + MODE TAF (work-mode) — apparence corporate sobre
+   BOUTON URGENCE + FAUX TABLEUR PLEIN ÉCRAN (mode urgence)
 ============================================================ */
 .panicbtn{display:inline-flex;align-items:center;gap:5px;background:var(--red);color:#fff;border:none;border-radius:999px;
   padding:8px 14px;font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;flex:none;
   box-shadow:0 4px 14px -6px rgba(239,43,61,.7);transition:transform .15s,background .15s}
 .panicbtn:hover{transform:translateY(-1px);background:#ff3b4d}
-.panicbtn .pb-work{display:none}
 @media(max-width:520px){.panicbtn{padding:7px 11px;font-size:12px}}
 
-/* --- variables corporate : recolore tout le site d'un coup --- */
-body.work-mode{
-  --ink:#f4f5f7; --ink-2:#eef1f5; --panel:#ffffff; --panel-2:#f6f8fa;
-  --line:#e3e6ea; --line-2:#d3d8df;
-  --paper:#33373d; --muted:#5b6270; --muted-2:#98a0ad;
-  --grass:#2d6cdf; --grass-deep:#2257c0; --grass-soft:rgba(45,108,223,.12);
-  --gold:#6b7280; --gold-soft:rgba(107,114,128,.12);
-  --red:#5b6270; --blue:#2d6cdf; --blue-soft:rgba(45,108,223,.12);
-  --shadow:0 6px 18px -12px rgba(0,0,0,.18);
-  background:#f4f5f7!important;color:#33373d;
-}
-/* masquer tout le décor festif */
-body.work-mode::before, body.work-mode::after{display:none!important}
-.work-mode .flagbar,.work-mode .stars-side,.work-mode .ledbar,.work-mode .resumay,
-.work-mode .hero-welcome,.work-mode .hero-collapsed,.work-mode .eaglebtn,.work-mode .countdown{display:none!important}
-/* heros -> panneau neutre */
-.work-mode .hero{background:#fff!important;border:1px solid #e3e6ea!important;box-shadow:none!important;color:#33373d!important;padding:18px 20px!important}
-.work-mode .hero::before,.work-mode .hero::after,.work-mode .hero .stripebar{display:none!important}
-.work-mode .hero h2{font-family:'Archivo',sans-serif!important;font-weight:800!important;text-transform:none!important;text-shadow:none!important;color:#33373d!important;font-size:20px!important;letter-spacing:0!important}
-.work-mode .hero .kick{color:#2d6cdf!important;letter-spacing:.4px}
-.work-mode .hero p,.work-mode .hero-meta span{color:#5b6270!important}
-.work-mode .hero-meta b{color:#33373d!important;font-family:'Archivo'!important}
-/* header / logo sobres */
-.work-mode header{border-bottom:1px solid #e3e6ea}
-.work-mode .brand h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:19px;color:#33373d;letter-spacing:0}
-.work-mode .brand h1 span{color:#2d6cdf}
-.work-mode .brand small{color:#98a0ad;letter-spacing:.4px}
-.work-mode .crest{background:#5b6270!important;box-shadow:none!important;border-radius:8px}
-.work-mode .crest::after{display:none!important}
-.work-mode .crest svg{display:none}
-/* onglet actif sobre */
-.work-mode .tabs{background:#fff;border-color:#e3e6ea}
-.work-mode .tab.on{background:#e8eef9;color:#2d6cdf}
-/* drapeaux & badges discrets */
-.work-mode .flag{filter:grayscale(1);opacity:.5}
-.work-mode .chan b{background:#e3e6ea!important;color:#6b7280!important}
-.work-mode .chan{color:#98a0ad!important}
-.work-mode .pbadge,.work-mode .pbadge.fin,.work-mode .pbadge.live{background:#eef1f5!important;color:#6b7280!important;border-color:#e3e6ea!important}
-/* news neutre */
-.work-mode .newscard .nimg{background:#eef1f5!important}
-.work-mode .newscard .nph-eagle svg,.work-mode .nph-paper{filter:grayscale(1) opacity(.55)}
-.work-mode .newscard .nmeta .nsrc{color:#5b6270!important}
-/* bouton Urgence -> état discret "Synced" */
-.work-mode .panicbtn{background:#eaeef4;color:#5b6270;border:1px solid #d3d8df;box-shadow:none;font-weight:600;font-size:12px;padding:6px 12px}
-.work-mode .panicbtn:hover{background:#e1e6ee;transform:none}
-.work-mode .panicbtn .pb-normal{display:none}
-.work-mode .panicbtn .pb-work{display:inline}
+/* overlay : couvre TOUT l'écran, opaque -> le site foot disparait derriere */
+.sheet-overlay{position:fixed;inset:0;z-index:9000;background:#fff;display:none;flex-direction:column;
+  font-family:Arial,'Segoe UI',Roboto,Helvetica,sans-serif;color:#202124;font-size:13px;-webkit-font-smoothing:antialiased}
+.sheet-overlay.on{display:flex}
+/* barre de menu */
+.sheet-menubar{display:flex;align-items:center;gap:9px;padding:6px 12px;border-bottom:1px solid #e0e0e0;background:#fff;flex:none;white-space:nowrap;overflow:hidden}
+.sheet-menubar .sheet-logo{color:#188038;font-size:16px}
+.sheet-menubar .sheet-fname{font-weight:600;color:#202124}
+.sheet-menubar .sheet-ro{color:#80868b;font-size:12px}
+.sheet-menubar .sheet-menus{color:#5f6368;font-size:12.5px;margin-left:8px;overflow:hidden;text-overflow:ellipsis}
+.sheet-menubar .sheet-exit{margin-left:auto;background:#e6f4ea;color:#188038;border:1px solid #cce8d4;border-radius:6px;
+  padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;flex:none}
+.sheet-menubar .sheet-exit:hover{background:#d6ecdd}
+/* barre d'outils */
+.sheet-toolbar{display:flex;align-items:center;gap:4px;padding:5px 12px;border-bottom:1px solid #e8eaed;background:#f9fbfd;flex:none;color:#444746;overflow:hidden;white-space:nowrap}
+.sheet-toolbar .ti{padding:3px 7px;border-radius:5px;font-size:13px}
+.sheet-toolbar .ti.b{font-weight:700}.sheet-toolbar .ti.i{font-style:italic}.sheet-toolbar .ti.u{text-decoration:underline}
+.sheet-toolbar .ti:hover{background:#eef0f2}
+.sheet-toolbar .tsep{width:1px;height:18px;background:#dadce0;margin:0 4px;flex:none}
+/* grille */
+.sheet-scroll{flex:1;overflow:auto;background:#fff}
+.sheet-grid{border-collapse:collapse;white-space:nowrap;font-size:12.5px}
+.sheet-grid th,.sheet-grid td{border:1px solid #e0e0e0;padding:4px 9px;text-align:left;height:24px}
+.sheet-grid thead th{position:sticky;top:0;z-index:3;background:#f1f3f4;color:#5f6368;text-align:center;font-weight:500;min-width:66px}
+.sheet-grid thead .corner{left:0;z-index:4;min-width:42px;width:42px}
+.sheet-grid .rownum{position:sticky;left:0;z-index:2;background:#f1f3f4;color:#5f6368;text-align:center;font-weight:500;min-width:42px;width:42px}
+.sheet-grid tbody tr:nth-child(even) td{background:#f8f9fa}
+.sheet-grid tbody tr:nth-child(even) .rownum{background:#eceff1}
+.sheet-grid .hcell{font-weight:700;background:#e8eaed!important;color:#202124}
+.sheet-grid .num{text-align:right;font-variant-numeric:tabular-nums}
+.sheet-grid .mono{font-family:'DM Mono','Consolas',monospace;color:#3c4043}
+.sheet-grid .cell-done{background:#e6f4ea!important;color:#137333}
+.sheet-grid .cell-risk{background:#fce8e6!important;color:#c5221f}
+.sheet-grid .num.neg{color:#c5221f}.sheet-grid .num.pos{color:#137333}
+.sheet-grid .cell-active{outline:2px solid #1a73e8;outline-offset:-2px;background:#e8f0fe!important}
+/* onglets de feuilles */
+.sheet-sheets{display:flex;align-items:center;gap:2px;padding:4px 10px;border-top:1px solid #e0e0e0;background:#f9fbfd;flex:none;overflow-x:auto;white-space:nowrap}
+.sheet-sheets .sht{padding:5px 14px;font-size:12.5px;color:#5f6368;border:1px solid transparent;border-radius:6px 6px 0 0}
+.sheet-sheets .sht.active{background:#fff;color:#188038;font-weight:600;border-color:#e0e0e0;border-bottom-color:#fff}
+.sheet-sheets .sht-add{color:#5f6368;padding:0 8px;font-size:16px}
+/* barre d'état */
+.sheet-statusbar{display:flex;align-items:center;gap:18px;padding:5px 14px;border-top:1px solid #e0e0e0;background:#f1f3f4;color:#5f6368;font-size:12px;flex:none;overflow-x:auto;white-space:nowrap}
+.sheet-statusbar .ssp{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -702,7 +697,7 @@ body.work-mode::before, body.work-mode::after{display:none!important}
         </div>
       </div>
       <div class="headright">
-        <button class="panicbtn" id="panicBtn" onclick="toggleWorkMode()" title="Patron en approche ?"><span class="pb-normal">🚨 Urgence</span><span class="pb-work">✓ Synced</span></button>
+        <button class="panicbtn" id="panicBtn" onclick="toggleWorkMode()" title="Patron en approche ?">🚨 Urgence</button>
         <div class="countdown"><span class="live-dot"></span> Kickoff dans <b id="cd">—</b></div>
         <button class="eaglebtn" onclick="usaChant()" title="U-S-A! 🦅">🦅</button>
         <button class="eaglebtn hostbtn" onclick="mexFiesta()" title="¡Fiesta! 🌶️">🌶️</button>
@@ -747,6 +742,9 @@ body.work-mode::before, body.work-mode::after{display:none!important}
 
 <!-- BANDEAU LED FIXE (partenaires officiels) -->
 <div class="ledbar" id="ledbar"></div>
+
+<!-- MODE URGENCE : faux tableur plein écran (rempli par JS) -->
+<div class="sheet-overlay" id="sheetOverlay"></div>
 
 <!-- CALENDAR MODAL -->
 <div class="overlay" id="calOverlay">
@@ -861,42 +859,111 @@ function closeMenu(){
 function go(v){
   state.view=v;
   [...tabs.children].forEach(t=>t.classList.toggle("on",t.dataset.v===v));
-  const cur=document.getElementById("curTab"); if(cur) cur.textContent=(workMode?WORK_TABS:TAB_LABELS)[v]||"";
+  const cur=document.getElementById("curTab"); if(cur) cur.textContent=TAB_LABELS[v]||"";
   closeMenu();
   render();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 /* ============================================================
-   MODE TAF (Bouton Urgence) — apparence corporate, état NON mémorisé
+   BOUTON URGENCE — faux tableur plein écran (état NON mémorisé)
+   Masque totalement le site et affiche un tableur corporate crédible.
 ============================================================ */
-let workMode=false;
-const WORK_TABS={pronos:"Tâches", classement:"Performance", news:"Actualités secteur", watchlist:"Favoris", groupes:"Équipes"};
+let workMode=false, _sheetBuilt=false;
 function toggleWorkMode(){ setWorkMode(!workMode); }
 function setWorkMode(on){
   workMode=on;
-  document.body.classList.toggle("work-mode",on);
-  // libellés des onglets (on garde data-v et le badge watchlist)
-  document.querySelectorAll('#tabs .tab').forEach(btn=>{
-    const v=btn.dataset.v;
-    if(on){
-      if(btn.dataset.orig===undefined) btn.dataset.orig=btn.innerHTML;
-      btn.innerHTML = v==="watchlist"
-        ? `${WORK_TABS[v]} <span class="badge" id="wlBadge" style="display:none">0</span>`
-        : (WORK_TABS[v]||btn.textContent);
-    }else if(btn.dataset.orig!==undefined){
-      btn.innerHTML=btn.dataset.orig;
-    }
+  const ov=document.getElementById("sheetOverlay");
+  if(!ov)return;
+  if(on && !_sheetBuilt){ ov.innerHTML=buildSheetHTML(); _sheetBuilt=true; }
+  ov.classList.toggle("on",on);
+  document.body.style.overflow=on?"hidden":""; // empêche le scroll du site derrière
+  if(on)ov.scrollTop=0;
+}
+
+// --- génération de fausses données corporate crédibles ---
+function genSheetRows(n){
+  const codes=["PRJ","ATL","OPS","FIN","MKT","INFRA","RH","LOG","QA","DATA"];
+  const owners=["M. Durand","S. Lefèvre","A. Moreau","C. Petit","L. Garnier","N. Rousseau","E. Faure","J. Mercier","P. Blanc","V. Henry","T. Girard","F. Roux","K. Lambert","D. Fontaine"];
+  const labels=["Migration ERP","Refonte portail","Audit conformité","Optimisation flux","Déploiement régional","Reporting consolidé","Maintenance évolutive","Cadrage budgétaire","Intégration API","Plan de continuité","Revue fournisseurs","Socle data"];
+  const statuses=[{t:"En cours",c:""},{t:"En attente",c:""},{t:"Clôturé",c:"cell-done"},{t:"À risque",c:"cell-risk"},{t:"Validé",c:"cell-done"},{t:"En cours",c:""}];
+  const prios=["Haute","Moyenne","Basse"];
+  const ri=a=>a[Math.floor(Math.random()*a.length)];
+  const pad=(x,w)=>String(x).padStart(w,"0");
+  const rows=[];
+  for(let i=0;i<n;i++){
+    const ref=ri(codes)+"-"+pad(Math.floor(Math.random()*8900)+100,4);
+    const av=Math.floor(Math.random()*101);
+    const budget=Math.floor(Math.random()*920)+40;            // k€
+    const real=Math.max(0,Math.round(budget*(av/100)*(0.78+Math.random()*0.5)));
+    const ecart=real-budget;
+    const ech=pad(Math.floor(Math.random()*28)+1,2)+"/"+pad(Math.floor(Math.random()*12)+1,2)+"/2026";
+    rows.push({
+      id:pad(1040+i,4), ref, label:ri(labels), owner:ri(owners),
+      st:ri(statuses), av, budget, real, ecart, ech, prio:ri(prios)
+    });
+  }
+  return rows;
+}
+const _nf=new Intl.NumberFormat("fr-FR");
+function buildSheetHTML(){
+  const rows=genSheetRows(42);
+  const cols=["ID","Référence projet","Intitulé","Responsable","Statut","Avanc. %","Budget (k€)","Réalisé (k€)","Écart","Échéance","Priorité"];
+  const letters=cols.map((_,i)=>String.fromCharCode(65+i)); // A,B,C...
+  // ligne d'en-tête métier = "ligne 1"
+  let body=`<tr><td class="rownum">1</td>${cols.map(c=>`<td class="hcell">${c}</td>`).join("")}</tr>`;
+  rows.forEach((r,i)=>{
+    const ecartCls=r.ecart>0?"neg":"pos";
+    const active=(i===4)?"cell-active":""; // une cellule "sélectionnée"
+    body+=`<tr>
+      <td class="rownum">${i+2}</td>
+      <td>${r.id}</td>
+      <td class="mono">${r.ref}</td>
+      <td>${r.label}</td>
+      <td>${r.owner}</td>
+      <td class="${r.st.c}">${r.st.t}</td>
+      <td class="num ${active}">${r.av}%</td>
+      <td class="num">${_nf.format(r.budget)}</td>
+      <td class="num">${_nf.format(r.real)}</td>
+      <td class="num ${ecartCls}">${r.ecart>0?"+":""}${_nf.format(r.ecart)}</td>
+      <td class="mono">${r.ech}</td>
+      <td>${r.prio}</td>
+    </tr>`;
   });
-  // titre / sous-titre du header
-  const h1=document.querySelector('.brand h1'), sm=document.querySelector('.brand small');
-  if(h1){ if(on){ if(h1.dataset.orig===undefined)h1.dataset.orig=h1.innerHTML; h1.textContent="Projet Atlas"; }
-          else if(h1.dataset.orig!==undefined){ h1.innerHTML=h1.dataset.orig; } }
-  if(sm){ if(on){ if(sm.dataset.orig===undefined)sm.dataset.orig=sm.textContent; sm.textContent="Suivi d'activité — Q3"; }
-          else if(sm.dataset.orig!==undefined){ sm.textContent=sm.dataset.orig; } }
-  // libellé courant (mobile) + badge watchlist a jour
-  const cur=document.getElementById("curTab"); if(cur) cur.textContent=(on?WORK_TABS:TAB_LABELS)[state.view]||"";
-  const wl=document.getElementById("wlBadge"); if(wl){const n=state.watch.length; wl.textContent=n; wl.style.display=n>0?"":"none";}
+  const colLetters=`<tr class="colrow"><th class="corner"></th>${letters.map(l=>`<th>${l}</th>`).join("")}</tr>`;
+  const totBudget=rows.reduce((s,r)=>s+r.budget,0), totReal=rows.reduce((s,r)=>s+r.real,0);
+  const moy=(rows.reduce((s,r)=>s+r.av,0)/rows.length).toFixed(1).replace(".",",");
+  return `
+  <div class="sheet-menubar">
+    <span class="sheet-logo">▦</span>
+    <span class="sheet-fname">Reporting_Q3_2026_v4.xlsx</span>
+    <span class="sheet-ro">— Lecture seule</span>
+    <span class="sheet-menus">Fichier&nbsp;&nbsp;Édition&nbsp;&nbsp;Affichage&nbsp;&nbsp;Insertion&nbsp;&nbsp;Format&nbsp;&nbsp;Données&nbsp;&nbsp;Outils&nbsp;&nbsp;Aide</span>
+    <button class="sheet-exit" onclick="toggleWorkMode()" title="Synchronisé">✓ Synced</button>
+  </div>
+  <div class="sheet-toolbar">
+    <span class="ti">↶</span><span class="ti">↷</span><span class="tsep"></span>
+    <span class="ti">100%</span><span class="tsep"></span>
+    <span class="ti b">B</span><span class="ti i">I</span><span class="ti u">U</span><span class="tsep"></span>
+    <span class="ti">Σ</span><span class="ti">%</span><span class="ti">,</span><span class="tsep"></span>
+    <span class="ti">▦ Bordures</span><span class="ti">⛃ Filtres</span><span class="ti">⤢ Figer</span>
+  </div>
+  <div class="sheet-scroll">
+    <table class="sheet-grid">
+      <thead>${colLetters}</thead>
+      <tbody>${body}</tbody>
+    </table>
+  </div>
+  <div class="sheet-sheets">
+    <span class="sht active">Synthèse</span><span class="sht">Q1</span><span class="sht">Q2</span><span class="sht">Q3</span><span class="sht">Budget</span><span class="sht">Annexes</span>
+    <span class="sht-add">+</span>
+  </div>
+  <div class="sheet-statusbar">
+    <span>Prêt</span>
+    <span class="ssp">Moyenne&nbsp;:&nbsp;${moy}</span>
+    <span class="ssp">Nb&nbsp;(val)&nbsp;:&nbsp;${rows.length*7}</span>
+    <span class="ssp">Somme&nbsp;:&nbsp;${_nf.format(totBudget+totReal)}</span>
+  </div>`;
 }
 
 /* ============================================================
