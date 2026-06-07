@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <pattern id="stripe" width="10" height="7" patternUnits="userSpaceOnUse">
+      <rect width="10" height="7" fill="#ffffff"/>
+      <rect width="5" height="7" fill="#ef2b3d"/>
+    </pattern>
+    <clipPath id="crestClip"><rect x="34" y="5" width="52" height="52" rx="12"/></clipPath>
+  </defs>
+  <!-- carré logo (bleu) -->
+  <rect x="34" y="5" width="52" height="52" rx="12" fill="#2f6bff"/>
+  <!-- mascotte -->
+  <svg x="41" y="7" width="38" height="43" viewBox="0 0 140 158" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+ <defs>
+  <radialGradient id="egg" cx="38%" cy="26%" r="82%">
+   <stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#f1f5fa"/><stop offset="100%" stop-color="#d4deec"/>
+  </radialGradient>
+  <radialGradient id="wingG" cx="42%" cy="28%" r="85%">
+   <stop offset="0%" stop-color="#eef3f9"/><stop offset="100%" stop-color="#c2cfe1"/>
+  </radialGradient>
+  <radialGradient id="beakG" cx="34%" cy="28%" r="85%">
+   <stop offset="0%" stop-color="#ffd57f"/><stop offset="55%" stop-color="#ffaf3c"/><stop offset="100%" stop-color="#ef8b16"/>
+  </radialGradient>
+  <linearGradient id="earG" x1="0" y1="0" x2="1" y2="1">
+   <stop offset="0%" stop-color="#5b8dff"/><stop offset="100%" stop-color="#2a61ef"/>
+  </linearGradient>
+  <linearGradient id="bandG" x1="0" y1="0" x2="1" y2="0">
+   <stop offset="0%" stop-color="#ff5a68"/><stop offset="100%" stop-color="#e11d2e"/>
+  </linearGradient>
+  <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.4"/></filter>
+ </defs>
+
+ <ellipse cx="70" cy="148" rx="40" ry="7" fill="#0a1733" opacity="0.16" filter="url(#soft)"/>
+ <ellipse cx="55" cy="142" rx="11" ry="7" fill="url(#beakG)"/>
+ <ellipse cx="85" cy="142" rx="11" ry="7" fill="url(#beakG)"/>
+
+ <ellipse cx="58" cy="20" rx="6" ry="13" fill="url(#egg)" transform="rotate(-18 58 20)"/>
+ <ellipse cx="70" cy="15" rx="6.5" ry="14" fill="url(#egg)"/>
+ <ellipse cx="82" cy="20" rx="6" ry="13" fill="url(#egg)" transform="rotate(18 82 20)"/>
+
+ <ellipse cx="25" cy="86" rx="13" ry="25" fill="url(#wingG)" transform="rotate(13 25 86)"/>
+ <ellipse cx="115" cy="86" rx="13" ry="25" fill="url(#wingG)" transform="rotate(-13 115 86)"/>
+
+ <ellipse cx="70" cy="76" rx="46" ry="58" fill="url(#egg)"/>
+ <ellipse cx="50" cy="42" rx="15" ry="20" fill="#ffffff" opacity="0.4" filter="url(#soft)"/>
+
+ <path d="M30 40 Q70 2 110 40" fill="none" stroke="url(#bandG)" stroke-width="9" stroke-linecap="round"/>
+ <rect x="21" y="40" width="20" height="27" rx="9" fill="url(#earG)"/>
+ <rect x="99" y="40" width="20" height="27" rx="9" fill="url(#earG)"/>
+ <ellipse cx="28" cy="47" rx="4" ry="6" fill="#fff" opacity="0.5"/>
+ <ellipse cx="106" cy="47" rx="4" ry="6" fill="#fff" opacity="0.5"/>
+ <text x="109" y="59" font-size="11" fill="#fff" text-anchor="middle">★</text>
+
+ <circle cx="56" cy="62" r="15" fill="#ffffff"/>
+ <circle cx="84" cy="62" r="15" fill="#ffffff"/>
+ <circle cx="59" cy="64" r="7" fill="#0a1733"/>
+ <circle cx="87" cy="64" r="7" fill="#0a1733"/>
+ <circle cx="61.4" cy="61.4" r="2.4" fill="#fff"/>
+ <circle cx="89.4" cy="61.4" r="2.4" fill="#fff"/>
+ <path d="M45 46 q10 -6 20 -1" stroke="#0a1733" stroke-width="4" fill="none" stroke-linecap="round"/>
+ <path d="M75 45 q10 -5 20 1" stroke="#0a1733" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+ <path d="M57 76 q13 -9 26 0 q-4 17 -13 19 q-9 -2 -13 -19Z" fill="url(#beakG)"/>
+ <ellipse cx="66" cy="82" rx="4" ry="6" fill="#fff" opacity="0.45"/>
+ <path d="M61 94 q9 6 18 0 q-3 8 -9 8 q-6 0 -9 -8Z" fill="#d97e0c"/>
+
+ <path d="M104 65 Q92 94 73 92" fill="none" stroke="#0a1733" stroke-width="4" stroke-linecap="round"/>
+ <circle cx="71" cy="92" r="6.5" fill="url(#bandG)"/>
+ <circle cx="69" cy="90" r="2" fill="#fff" opacity="0.55"/>
+</svg>
+  <!-- liseré rouge/blanc en bas du carré -->
+  <rect x="34" y="50" width="52" height="7" fill="url(#stripe)" clip-path="url(#crestClip)"/>
+  <!-- CM26 -->
+  <text x="60" y="84" text-anchor="middle" font-family="Impact, 'Arial Narrow', Haettenschweiler, sans-serif" font-size="26" letter-spacing="1" fill="#0a1733">CM<tspan fill="#ef2b3d">26</tspan></text>
+  <!-- tagline -->
+  <text x="60" y="99" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="7.2" letter-spacing="2" fill="#5b6b8a">THE GREATEST SHOW</text>
+</svg>
