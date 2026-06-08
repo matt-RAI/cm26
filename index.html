@@ -328,6 +328,17 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
   50%{box-shadow:0 0 0 10px rgba(255,206,58,0);transform:scale(1.2);background:var(--gold-soft);border-color:var(--gold)}
   100%{box-shadow:0 0 0 0 rgba(255,206,58,0);transform:scale(1)}
 }
+/* pulse bleu des cases de score (tuile Pronos) */
+.scorebox.blink-score{border-radius:10px;animation:scorepulse .85s ease-in-out 7}
+.scorebox.blink-score input{border-color:var(--blue)!important}
+@keyframes scorepulse{
+  0%{box-shadow:0 0 0 0 rgba(47,107,255,.6)}
+  50%{box-shadow:0 0 0 9px rgba(47,107,255,0)}
+  100%{box-shadow:0 0 0 0 rgba(47,107,255,0)}
+}
+/* halo de la carte Morning Resumay (tuile Resumay) */
+.resumay.rglow{animation:rglow 1s ease-in-out 3}
+@keyframes rglow{0%,100%{box-shadow:0 0 0 0 rgba(239,43,61,0)}50%{box-shadow:0 0 0 5px rgba(239,43,61,.4)}}
 
 /* ---------- MORNING RESUMAY (IA) ---------- */
 .resumay{background:#fbfaf5;color:#0a1733;border:2px solid #0a1733;border-radius:18px;
@@ -1955,7 +1966,7 @@ function matchPronoRow(m){
   const dis=locked?"disabled":"";
   const middle=hasScore
     ? `<div class="scorebox"><span class="sc">${sc.home}</span><span>–</span><span class="sc">${sc.away}</span></div>`
-    : `<div class="scorebox">
+    : `<div class="scorebox ${id===_blinkScore?'blink-score':''}" id="score-${id}">
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.a??''}" placeholder="–" ${dis} onchange="setProno('${id}','a',this.value)">
         <span title="${locked?'Match commencé — prono verrouillé':''}">${locked?'🔒':'–'}</span>
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.b??''}" placeholder="–" ${dis} onchange="setProno('${id}','b',this.value)">
@@ -2108,7 +2119,7 @@ function matchResultRow(m){
 function dismissHero(){store.set("cm26_hero_dismissed",true);render()}
 function expandHero(){store.set("cm26_hero_dismissed",false);render()}
 // Tuiles du QG : amènent au match France-Norvège et font pulser un picto (pour montrer où c'est).
-let _blinkCal=null; // id du match dont le bouton agenda doit pulser (survit aux re-render)
+let _blinkCal=null, _blinkScore=null; // ids du match dont le bouton/score doit pulser (survit aux re-render)
 function findFraNor(){
   return (apiMatches||[]).find(x=>{
     const a=teamCode(x.homeTeam),b=teamCode(x.awayTeam);
@@ -2139,6 +2150,26 @@ function showDiscreetDemo(){
   calCtx.discreet=true;    // active le mode discret
   drawCal();               // re-rend la modale avec le faux titre "pro"
 }
+// Tuile "Pronos" du QG : amène à France-Norvège et fait pulser les cases de score.
+function showPronoHint(){
+  const m=findFraNor();
+  if(!m){toast("Le match France–Norvège n'est pas encore disponible.");return}
+  _blinkScore=String(m.id);
+  gotoFraNor("score-",m);
+  setTimeout(()=>{_blinkScore=null;},6500);
+}
+// Tuile "Morning Resumay" du QG : déplie la carte et y amène.
+function showResumayDemo(){
+  if(!state.resumayOpen){state.resumayOpen=true;store.set("cm26_resumayOpen",true)}
+  if(state.view!=="pronos")go("pronos"); else render();
+  setTimeout(()=>{
+    const el=document.querySelector(".resumay");
+    if(!el)return;
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+    el.classList.remove("rglow"); void el.offsetWidth; el.classList.add("rglow");
+    setTimeout(()=>el.classList.remove("rglow"),3600);
+  },160);
+}
 function heroWelcomeHTML(){
   if(store.get("cm26_hero_dismissed",false)){
     return `<button class="hero-collapsed" onclick="expandHero()">▸ À propos de CM26</button>`;
@@ -2153,8 +2184,8 @@ function heroWelcomeHTML(){
       <div class="hf hf-click" onclick="showCalendarHint()" title="Voir le calendrier des matchs"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">Les 104 matchs, à l'heure de Paris, avec la chaîne TV</span></div>
       <div class="hf hf-click" onclick="go('watchlist')" title="Voir ma watchlist"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">Les matchs que tu ne veux pas manquer</span></div>
       <div class="hf hf-click" onclick="showDiscreetDemo()" title="Voir le mode agenda discret"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">Un intitulé sobre dans ton agenda professionnel</span></div>
-      <div class="hf"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">Pronostique et compare-toi au classement</span></div>
-      <div class="hf"><span class="hf-i hf-masc">${featMasc}</span><b>Morning Resumay</b><span class="hf-d">Chaque matin : le récap de la nuit et les matchs du jour</span></div>
+      <div class="hf hf-click" onclick="showPronoHint()" title="Pronostiquer un match"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">Pronostique et compare-toi au classement</span></div>
+      <div class="hf hf-click" onclick="showResumayDemo()" title="Ouvrir le Morning Resumay"><span class="hf-i hf-masc">${featMasc}</span><b>Morning Resumay</b><span class="hf-d">Chaque matin : le récap de la nuit et les matchs du jour</span></div>
     </div>
   </div>`;
 }
