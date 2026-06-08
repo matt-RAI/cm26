@@ -2131,6 +2131,14 @@ function showCalendarHint(){
   gotoFraNor("cal-",m);
   setTimeout(()=>{_blinkCal=null;},6500);
 }
+// Tuile "Agenda discret" du QG : ouvre la modale agenda (France-Norvège) avec le mode discret déjà activé.
+function showDiscreetDemo(){
+  const m=findFraNor();
+  if(!m){toast("Le match France–Norvège n'est pas encore disponible.");return}
+  openCal(String(m.id));   // ouvre la modale agenda
+  calCtx.discreet=true;    // active le mode discret
+  drawCal();               // re-rend la modale avec le faux titre "pro"
+}
 function heroWelcomeHTML(){
   if(store.get("cm26_hero_dismissed",false)){
     return `<button class="hero-collapsed" onclick="expandHero()">▸ À propos de CM26</button>`;
@@ -2144,7 +2152,7 @@ function heroWelcomeHTML(){
     <div class="herofeats">
       <div class="hf hf-click" onclick="showCalendarHint()" title="Voir le calendrier des matchs"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">Les 104 matchs, à l'heure de Paris, avec la chaîne TV</span></div>
       <div class="hf hf-click" onclick="go('watchlist')" title="Voir ma watchlist"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">Les matchs que tu ne veux pas manquer</span></div>
-      <div class="hf"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">Un intitulé sobre dans ton agenda professionnel</span></div>
+      <div class="hf hf-click" onclick="showDiscreetDemo()" title="Voir le mode agenda discret"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">Un intitulé sobre dans ton agenda professionnel</span></div>
       <div class="hf"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">Pronostique et compare-toi au classement</span></div>
       <div class="hf"><span class="hf-i hf-masc">${featMasc}</span><b>Morning Resumay</b><span class="hf-d">Chaque matin : le récap de la nuit et les matchs du jour</span></div>
     </div>
