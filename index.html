@@ -1936,6 +1936,12 @@ function renderClassement(){
     </div>`;
   }
 
+  // accès "rejoindre / créer une ligue" même quand on a déjà des orgas
+  let leagueBtn="";
+  if(scope==="orga" && orgas.length){
+    leagueBtn=`<button class="chip" style="margin-top:12px" onclick="openOrgaManager()">➕ Rejoindre ou créer une ligue</button>`;
+  }
+
   let body, note=`<p class="sub" style="margin-top:14px;color:var(--muted-2)">Le classement s'animera dès les premiers résultats 🏁</p>`;
   if(scope==="orga" && !orgas.length){
     body=`<div class="gate" style="padding:28px;margin-top:12px">
@@ -1958,6 +1964,7 @@ function renderClassement(){
     ${scopeTabs}
     ${orgaSelector}
     ${codeBanner}
+    ${leagueBtn}
     ${body}
     ${note}
     <button class="chip" style="margin-top:16px" onclick="refreshLeaderboard()">↻ Rafraîchir</button>
