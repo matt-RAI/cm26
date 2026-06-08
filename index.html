@@ -328,6 +328,12 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
   50%{box-shadow:0 0 0 10px rgba(255,206,58,0);transform:scale(1.2);background:var(--gold-soft);border-color:var(--gold)}
   100%{box-shadow:0 0 0 0 rgba(255,206,58,0);transform:scale(1)}
 }
+.iconbtn.blink-star{animation:starpulse .8s ease-in-out 8;border-color:var(--red)!important;color:var(--red)!important;position:relative;z-index:3}
+@keyframes starpulse{
+  0%{box-shadow:0 0 0 0 rgba(239,43,61,.7);transform:scale(1);background:var(--grass-soft)}
+  50%{box-shadow:0 0 0 10px rgba(239,43,61,0);transform:scale(1.2);background:var(--grass-soft);border-color:var(--red)}
+  100%{box-shadow:0 0 0 0 rgba(239,43,61,0);transform:scale(1)}
+}
 
 /* ---------- MORNING RESUMAY (IA) ---------- */
 .resumay{background:#fbfaf5;color:#0a1733;border:2px solid #0a1733;border-radius:18px;
@@ -1939,7 +1945,7 @@ function channelBadges(m){
 function matchActions(m){
   const id=String(m.id);
   if(!(m.homeTeam&&m.homeTeam.name&&m.awayTeam&&m.awayTeam.name))return "";
-  return `<button class="iconbtn star sm ${isWatched(id)?'on':''}" title="Ma watchlist" onclick="toggleWatch('${id}')">${isWatched(id)?'★':'☆'}</button>
+  return `<button class="iconbtn star sm ${isWatched(id)?'on':''} ${id===_blinkStar?'blink-star':''}" id="star-${id}" title="Ma watchlist" onclick="toggleWatch('${id}')">${isWatched(id)?'★':'☆'}</button>
     <button class="iconbtn cal sm ${id===_blinkCal?'blink':''}" id="cal-${id}" title="Ajouter à mon agenda" onclick="openCal('${id}')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button>`;
 }
@@ -2107,24 +2113,36 @@ function matchResultRow(m){
 /* Hero de bienvenue repliable (etat memorise dans localStorage) */
 function dismissHero(){store.set("cm26_hero_dismissed",true);render()}
 function expandHero(){store.set("cm26_hero_dismissed",false);render()}
-// Tuile "Calendrier" du QG : amène au match France-Norvège et fait pulser son picto agenda.
-let _blinkCal=null; // id du match dont le bouton agenda doit pulser (survit aux re-render)
-function showCalendarHint(){
-  const m=(apiMatches||[]).find(x=>{
+// Tuiles du QG : amènent au match France-Norvège et font pulser un picto (pour montrer où c'est).
+let _blinkCal=null, _blinkStar=null; // ids du match dont le bouton doit pulser (survit aux re-render)
+function findFraNor(){
+  return (apiMatches||[]).find(x=>{
     const a=teamCode(x.homeTeam),b=teamCode(x.awayTeam);
     return x.stage==="GROUP_STAGE" && ((a==="FRA"&&b==="NOR")||(a==="NOR"&&b==="FRA"));
   });
-  if(!m){toast("Le match France–Norvège n'est pas encore disponible.");return}
-  _blinkCal=String(m.id);
-  pronoFilter={jour:"all",date:"all",heure:"all",chaine:"all",team:""}; // on retire les filtres pour garantir l'affichage
-  if(state.view!=="pronos")go("pronos"); else render();
+}
+function gotoFraNor(btnPrefix,m){
+  pronoFilter={jour:"all",date:"all",heure:"all",chaine:"all",team:""}; // on retire les filtres
+  if(state.view!=="pronos")go("pronos"); else render(); // _blink* est déjà défini -> le bouton pulse dès ce rendu
   setTimeout(()=>{
-    const btn=document.getElementById("cal-"+m.id);
+    const btn=document.getElementById(btnPrefix+m.id);
     const card=btn&&btn.closest(".prono");
     if(card)card.scrollIntoView({behavior:"smooth",block:"center"});
   },160);
-  // on arrête le pulse après ~6 s (sans re-render : l'animation finie d'elle-même)
+}
+function showCalendarHint(){
+  const m=findFraNor();
+  if(!m){toast("Le match France–Norvège n'est pas encore disponible.");return}
+  _blinkStar=null; _blinkCal=String(m.id);
+  gotoFraNor("cal-",m);
   setTimeout(()=>{_blinkCal=null;},6500);
+}
+function showWatchlistHint(){
+  const m=findFraNor();
+  if(!m){toast("Le match France–Norvège n'est pas encore disponible.");return}
+  _blinkCal=null; _blinkStar=String(m.id);
+  gotoFraNor("star-",m);
+  setTimeout(()=>{_blinkStar=null;},6500);
 }
 function heroWelcomeHTML(){
   if(store.get("cm26_hero_dismissed",false)){
@@ -2138,7 +2156,7 @@ function heroWelcomeHTML(){
     <p>Suis tous les matchs, pronostique les scores, ajoute-les à ton agenda et compare-toi à tes amis.</p>
     <div class="herofeats">
       <div class="hf hf-click" onclick="showCalendarHint()" title="Voir le calendrier des matchs"><span class="hf-i">📅</span><b>Calendrier</b><span class="hf-d">Les 104 matchs, à l'heure de Paris, avec la chaîne TV</span></div>
-      <div class="hf"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">Les matchs que tu ne veux pas manquer</span></div>
+      <div class="hf hf-click" onclick="showWatchlistHint()" title="Mettre un match en watchlist"><span class="hf-i">⭐</span><b>Watchlist</b><span class="hf-d">Les matchs que tu ne veux pas manquer</span></div>
       <div class="hf"><span class="hf-i">🕵️</span><b>Agenda discret</b><span class="hf-d">Un intitulé sobre dans ton agenda professionnel</span></div>
       <div class="hf"><span class="hf-i">🎯</span><b>Pronos</b><span class="hf-d">Pronostique et compare-toi au classement</span></div>
       <div class="hf"><span class="hf-i hf-masc">${featMasc}</span><b>Morning Resumay</b><span class="hf-d">Chaque matin : le récap de la nuit et les matchs du jour</span></div>
