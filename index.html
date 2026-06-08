@@ -498,7 +498,16 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .userchip .orgabadge{font-size:11px;color:var(--muted);background:var(--ink-2);border:1px solid var(--line);
   border-radius:999px;padding:2px 9px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .usermenu .uhead .uorga{display:block;font-size:11px;color:var(--grass);margin-top:4px;font-weight:600}
+.usermenu .uhead .uorgacode{font-family:'DM Mono';color:var(--gold);background:var(--gold-soft);border-radius:6px;
+  padding:1px 6px;letter-spacing:1px;cursor:pointer;margin-left:3px}
+.usermenu .uhead .uorgacode:hover{background:var(--gold);color:var(--ink)}
 @media(max-width:600px){.userchip .orgabadge{display:none}}
+/* bandeau code d'orga (Classement > Mon orga) */
+.orgacode-box{margin-top:12px;background:var(--ink-2);border:1px dashed var(--line-2);border-radius:12px;padding:13px 15px;text-align:center}
+.orgacode-box .ocl{font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.5px}
+.orgacode-box .ocrow{display:flex;align-items:center;justify-content:center;gap:10px;margin:7px 0 4px}
+.orgacode-box .occode{font-family:'DM Mono';font-size:22px;color:var(--gold);letter-spacing:3px;font-weight:700}
+.orgacode-box .ocl2{font-size:11px;color:var(--muted-2);display:block}
 .usermenu{position:absolute;top:calc(100% + 8px);right:0;background:var(--panel-2);border:1px solid var(--line-2);
   border-radius:13px;padding:6px;min-width:172px;box-shadow:var(--shadow);display:none;z-index:40}
 .usermenu.on{display:block;animation:pop .18s}
@@ -993,7 +1002,9 @@ function renderAuth(){
     const pseudo=(state.profile&&state.profile.pseudo)||state.user.name;
     const ini=initials(pseudo).replace(/['"\\]/g,"");
     const orgas=state.orgas||[];
-    const orgaLine=orgas.length?orgas.map(o=>o.nom).join(", "):"Aucune orga pour l'instant";
+    const orgaBlock=orgas.length
+      ? orgas.map(o=>`<span class="uorga">🏷️ ${escAttr(o.nom)} <b class="uorgacode" title="Copier le code" onclick="copyOrgaCode(event,'${escAttr(o.code)}')">${escAttr(o.code)}</b></span>`).join("")
+      : `<span class="uorga" style="color:var(--muted-2)">Aucune orga pour l'instant</span>`;
     const orgaBadge=orgas.length?`<span class="orgabadge">🏷️ ${orgas[0].nom}${orgas.length>1?" +"+(orgas.length-1):""}</span>`:"";
     slot.innerHTML=`
       <div class="userchip" onclick="toggleUserMenu(event)">
@@ -1001,7 +1012,7 @@ function renderAuth(){
         <span class="un">${pseudo}</span>
         ${orgaBadge}
         <div class="usermenu">
-          <div class="uhead"><b>${pseudo}</b><span>${state.user.email||state.user.provider}</span><span class="uorga">🏷️ ${orgaLine}</span></div>
+          <div class="uhead"><b>${pseudo}</b><span>${state.user.email||state.user.provider}</span>${orgaBlock}</div>
           <button onclick="go('pronos')">🎯 Mes pronos</button>
           <button onclick="go('watchlist')">★ Ma watchlist</button>
           <button onclick="openOrgaManager()">➕ Créer ou rejoindre une orga</button>
@@ -1013,6 +1024,13 @@ function renderAuth(){
   }
 }
 function toggleUserMenu(e){e.stopPropagation();document.querySelector(".usermenu").classList.toggle("on")}
+// copie le code d'orga (sans fermer le menu profil)
+function copyOrgaCode(e,code){
+  if(e)e.stopPropagation();
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(()=>toast("Code copié ✓")).catch(()=>toast("Code : "+code));
+  }else{toast("Code : "+code)}
+}
 
 function openLogin(){drawLogin();authOverlay.classList.add("on")}
 function closeLogin(){authOverlay.classList.remove("on")}
@@ -1736,6 +1754,18 @@ function renderClassement(){
       </select></div>`;
   }
 
+  // bandeau "code de l'orga" (Mon orga)
+  let codeBanner="";
+  if(scope==="orga" && orgas.length){
+    const cur=orgas.find(o=>o.id===state.lbOrga)||orgas[0];
+    if(cur)codeBanner=`<div class="orgacode-box">
+      <span class="ocl">Code de l'orga « ${escAttr(cur.nom)} »</span>
+      <div class="ocrow"><b class="occode">${escAttr(cur.code)}</b>
+        <button class="chip" onclick="copyOrgaCode(event,'${escAttr(cur.code)}')">📋 Copier</button></div>
+      <span class="ocl2">Partage-le pour inviter tes amis dans ton orga.</span>
+    </div>`;
+  }
+
   let body, note=`<p class="sub" style="margin-top:14px;color:var(--muted-2)">Le classement s'animera dès les premiers résultats 🏁</p>`;
   if(scope==="orga" && !orgas.length){
     body=`<div class="gate" style="padding:28px;margin-top:12px">
@@ -1757,6 +1787,7 @@ function renderClassement(){
     <p class="sub">${scope==="orga"?"Entre membres de ton orga":"Tous les joueurs CM26"}</p>
     ${scopeTabs}
     ${orgaSelector}
+    ${codeBanner}
     ${body}
     ${note}
     <button class="chip" style="margin-top:16px" onclick="refreshLeaderboard()">↻ Rafraîchir</button>
