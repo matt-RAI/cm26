@@ -900,7 +900,34 @@ function go(v){
   closeMenu();
   render();
   window.scrollTo({top:0,behavior:"smooth"});
+  // pousse une entrée d'historique pour que "Précédent" revienne à l'onglet d'avant
+  if(_navReady && !_silentNav && (!history.state || history.state.view!==v)) history.pushState({view:v},"");
 }
+
+/* ============================================================
+   NAVIGATION HISTORIQUE — bouton "Précédent" / geste retour
+   - changer d'onglet ajoute une entrée -> Précédent revient à l'onglet
+   - une modale ouverte est fermée en PRIORITÉ par Précédent (mobile)
+============================================================ */
+let _navReady=false, _silentNav=false, _modalGuards=0;
+function anyModalOpen(){
+  const o=id=>{const e=document.getElementById(id);return !!(e&&e.classList.contains("on"))};
+  return o("authOverlay")||o("calOverlay")||o("sheetOverlay");
+}
+function forceCloseModals(){
+  ["authOverlay","calOverlay"].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.remove("on")});
+  const sh=document.getElementById("sheetOverlay");
+  if(sh && sh.classList.contains("on")){ workMode=false; sh.classList.remove("on"); document.body.style.overflow=""; }
+}
+// à l'ouverture d'une modale : on pousse un "garde" -> Précédent la fermera
+function pushModalGuard(){ if(_navReady){ _modalGuards++; history.pushState({modal:true},""); } }
+// fermeture (commune aux boutons ✕/backdrop ET au bouton Précédent)
+function closeModalNav(){ if(_modalGuards>0){ history.back(); } else { forceCloseModals(); } }
+window.addEventListener("popstate", function(e){
+  if(anyModalOpen()){ forceCloseModals(); if(_modalGuards>0)_modalGuards--; return; } // 1) fermer la modale
+  const v=(e.state && e.state.view) || state.view;                                    // 2) sinon restaurer l'onglet
+  if(v!==state.view){ _silentNav=true; go(v); _silentNav=false; }
+});
 
 /* ============================================================
    BOUTON URGENCE — faux tableur plein écran (état NON mémorisé)
@@ -909,13 +936,14 @@ function go(v){
 let workMode=false, _sheetBuilt=false;
 function toggleWorkMode(){ setWorkMode(!workMode); }
 function setWorkMode(on){
+  if(on===workMode)return;
   workMode=on;
   const ov=document.getElementById("sheetOverlay");
   if(!ov)return;
   if(on && !_sheetBuilt){ ov.innerHTML=buildSheetHTML(); _sheetBuilt=true; }
   ov.classList.toggle("on",on);
   document.body.style.overflow=on?"hidden":""; // empêche le scroll du site derrière
-  if(on)ov.scrollTop=0;
+  if(on){ ov.scrollTop=0; pushModalGuard(); } // Précédent fermera le tableur
 }
 
 // --- génération de fausses données corporate crédibles ---
@@ -976,7 +1004,7 @@ function buildSheetHTML(){
     <span class="sheet-fname">Reporting_Q3_2026_v4.xlsx</span>
     <span class="sheet-ro">— Lecture seule</span>
     <span class="sheet-menus">Fichier&nbsp;&nbsp;Édition&nbsp;&nbsp;Affichage&nbsp;&nbsp;Insertion&nbsp;&nbsp;Format&nbsp;&nbsp;Données&nbsp;&nbsp;Outils&nbsp;&nbsp;Aide</span>
-    <button class="sheet-exit" onclick="toggleWorkMode()" title="Synchronisé">✓ Synced</button>
+    <button class="sheet-exit" onclick="closeModalNav()" title="Synchronisé">✓ Synced</button>
   </div>
   <div class="sheet-toolbar">
     <span class="ti">↶</span><span class="ti">↷</span><span class="tsep"></span>
@@ -1051,8 +1079,8 @@ function copyOrgaCode(e,code){
   }else{toast("Code : "+code)}
 }
 
-function openLogin(){drawLogin();authOverlay.classList.add("on")}
-function closeLogin(){authOverlay.classList.remove("on")}
+function openLogin(){drawLogin();authOverlay.classList.add("on");pushModalGuard()}
+function closeLogin(){closeModalNav()}
 
 const G_ICON=`<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>`;
 function drawLogin(){
@@ -1212,11 +1240,11 @@ let onbStep=null;        // 'pseudo' | 'orga' | 'created'
 let onbOrgaMode=null;    // null (choix) | 'create' | 'join'
 let onbCreatedCode="";   // code généré à afficher
 
-function openOnboarding(){onbStep="pseudo";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on")}
+function openOnboarding(){onbStep="pseudo";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on");pushModalGuard()}
 // Ouvre directement l'étape B (créer/rejoindre) depuis le menu profil, sans repasser par le pseudo.
 function openOrgaManager(){
   const m=document.querySelector(".usermenu");if(m)m.classList.remove("on"); // ferme le menu deroulant
-  onbStep="orga";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on");
+  onbStep="orga";onbOrgaMode=null;drawOnboarding();authOverlay.classList.add("on");pushModalGuard();
 }
 function onbSetMode(m){onbOrgaMode=m;drawOnboarding()}
 
@@ -1411,9 +1439,9 @@ const DISCREET=[
 let calCtx={id:null,discreet:false,dn:""};
 function openCal(id){
   calCtx={id,discreet:false,dn:DISCREET[Math.floor(Math.random()*DISCREET.length)]};
-  drawCal();document.getElementById("calOverlay").classList.add("on");
+  drawCal();document.getElementById("calOverlay").classList.add("on");pushModalGuard();
 }
-function closeCal(){document.getElementById("calOverlay").classList.remove("on")}
+function closeCal(){closeModalNav()}
 document.getElementById("calOverlay").addEventListener("click",e=>{if(e.target.id==="calOverlay")closeCal()});
 
 function apiMatchById(id){return (apiMatches||[]).find(x=>String(x.id)===String(id))}
@@ -1500,7 +1528,7 @@ function downloadICS(withGuests){
   toast(guests.length?`Invitation prête pour ${guests.length} ami${guests.length>1?'s':''} ✉️`:"Ajouté à ton agenda 📅");
 }
 function exportAll(){calCtx={id:"ALL",discreet:false,dn:DISCREET[0]};
-  document.getElementById("calOverlay").classList.add("on");
+  document.getElementById("calOverlay").classList.add("on");pushModalGuard();
   document.getElementById("calModal").innerHTML=`
     <button class="close" onclick="closeCal()">✕</button>
     <h3>Exporter ma watchlist</h3>
@@ -2664,6 +2692,8 @@ renderAuth();
 render();
 initSupabaseAuth(); // vérifie la session Google et met à jour le header
 syncResults();      // synchro auto des résultats au chargement (non bloquant)
+// navigation historique : état de base pour le bouton "Précédent"
+try{ history.replaceState({view:state.view},""); _navReady=true; }catch(e){ _navReady=false; }
 </script>
 </body>
 </html>
