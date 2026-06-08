@@ -1415,9 +1415,15 @@ function fmtDay(d){
 ============================================================ */
 const ADMIN_ID="a0f61faf-746c-48c8-b70d-dea2f2fd3304";
 function isDashboardRoute(){
-  return location.pathname.replace(/\/+$/,"")==="/dashboard"
-    || /[?&]view=dashboard\b/.test(location.search)
-    || location.hash==="#dashboard";
+  // Méthode FIABLE (indépendante du routing serveur) : la racine / + un paramètre.
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has("admin") || q.get("view")==="dashboard") return true;
+  }catch(e){}
+  if(location.hash==="#dashboard" || location.hash==="#admin") return true;
+  // si jamais le chemin /dashboard est servi tel quel (selon la config CF)
+  const p=location.pathname.replace(/\/+$/,"");
+  return p==="/dashboard" || p==="/admin";
 }
 function isAdmin(){ return !!(state.user && state.user.id===ADMIN_ID); }
 let statsCache=null, statsLoading=false, statsError=null, statsAt=null;
