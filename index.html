@@ -1023,7 +1023,11 @@ function drawLogin(){
     <button class="close" onclick="closeLogin()">✕</button>
     <h3>Rejoins tes amis ⚽</h3>
     <p class="msub">Connecte-toi pour participer au concours de pronostics et synchroniser ta watchlist. La navigation reste libre.</p>
-    <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>`;
+    <button class="provbtn" onclick="loginGoogle()">${G_ICON} Continuer avec Google</button>
+    <div class="adivider">ou</div>
+    <div class="field"><input id="magicEmail" type="email" inputmode="email" autocapitalize="off" autocomplete="email" placeholder="ton.email@exemple.com" onkeydown="if(event.key==='Enter')loginMagicLink()"></div>
+    <button class="calbtn" id="magicBtn" style="width:100%" onclick="loginMagicLink()">✉️ Recevoir un lien de connexion</button>
+    <p style="font-size:11px;color:var(--muted-2);margin-top:8px;text-align:center">Pas de compte Google ? On t'envoie un lien de connexion par e-mail.</p>`;
 }
 function logout(){if(supabase){supabase.auth.signOut()}state.user=null;state.profile=null;state.orgas=[];state.tournoi=null;loadedUserId=null;lbCache=null;store.set("tifo_user",null);store.set("cm26_profile",null);store.set("cm26_orgas",[]);store.set("cm26_tournoi",null);renderAuth();render();toast("À bientôt 👋")}
 
@@ -1039,6 +1043,33 @@ async function loginGoogle(){
     options:{redirectTo:window.location.origin}
   });
   if(error){toast("Connexion impossible : "+error.message)}
+}
+
+// Connexion par e-mail (magic link / OTP). Le retour est géré comme Google
+// (le SDK détecte la session dans l'URL au chargement -> onboarding si besoin).
+async function loginMagicLink(){
+  if(!supabase){toast("Connexion en cours d'initialisation… réessaie dans 1s");return}
+  const el=document.getElementById("magicEmail");
+  const email=(el?el.value:"").trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("E-mail invalide");return}
+  const btn=document.getElementById("magicBtn");
+  if(btn){btn.disabled=true;btn.style.opacity=".7";btn.textContent="Envoi du lien…";}
+  const {error}=await supabase.auth.signInWithOtp({
+    email,
+    options:{emailRedirectTo:"https://cm26.workplay.fr"}
+  });
+  if(error){
+    if(btn){btn.disabled=false;btn.style.opacity="";btn.textContent="✉️ Recevoir un lien de connexion";}
+    toast("Envoi impossible : "+error.message);
+    return;
+  }
+  // succès -> on remplace la modale par un message clair
+  authModal.innerHTML=`
+    <button class="close" onclick="closeLogin()">✕</button>
+    <h3>Lien envoyé 📧</h3>
+    <p class="msub">Vérifie ta boîte mail (et tes spams), puis clique sur le lien pour te connecter. L'e-mail vient de <b>cm26@workplay.fr</b>.</p>
+    <button class="calbtn full" style="width:100%" onclick="closeLogin()">J'ai compris</button>`;
+  toast("📧 Lien envoyé ! Vérifie ta boîte mail.");
 }
 
 let loadedUserId=null; // évite de relancer le chargement / l'onboarding à chaque event
