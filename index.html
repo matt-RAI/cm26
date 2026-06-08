@@ -1525,9 +1525,14 @@ const TOP_SCORERS = ["Kylian Mbappé","Harry Kane","Erling Haaland","Julián Ál
 const BEST_PLAYERS = ["Kylian Mbappé","Lamine Yamal","Jude Bellingham","Vinícius Júnior","Jamal Musiala","Florian Wirtz","Harry Kane","Rodri","Ousmane Dembélé","Erling Haaland","Lionel Messi","Julián Álvarez","Lautaro Martínez","Raphinha","Nico Williams","Bruno Fernandes","Vitinha","Cristiano Ronaldo","Federico Valverde","Alexis Mac Allister","Mohamed Salah","Achraf Hakimi","Luis Díaz","Declan Rice","Martin Ødegaard","Moisés Caicedo","Enzo Fernández","Bernardo Silva","Michael Olise","João Neves","Christian Pulisic","Alphonso Davies","Neymar","Omar Marmoush","Takefusa Kubo","Lee Kang-in","Emiliano Martínez","Brahim Díaz","Désiré Doué","Endrick"];
 
 // Date de coup d'envoi : avant -> modifiable ; après -> verrouillé.
-const KICKOFF = new Date("2026-06-11T00:00:00");
-function tournamentLocked(){return new Date()>=KICKOFF}
-function daysToKickoff(){return Math.max(0,Math.ceil((KICKOFF-new Date())/86400000))}
+// Premier match du Mondial : 11 juin 2026 19:00 UTC (= 21:00 Paris).
+const FIRST_KICKOFF = new Date("2026-06-11T19:00:00Z");
+// Deadline des pronos de TOURNOI : 1 h avant le 1er match -> 18:00 UTC (= 20:00 Paris).
+const TOURNAMENT_LOCK = new Date("2026-06-11T18:00:00Z");
+// Pronos de MATCH : verrouillage 1 h avant chaque coup d'envoi.
+const MATCH_LOCK_BEFORE_MS = 60*60*1000;
+function tournamentLocked(){ return Date.now() >= TOURNAMENT_LOCK.getTime(); }
+function daysToLock(){ return Math.max(0, Math.ceil((TOURNAMENT_LOCK.getTime()-Date.now())/86400000)); }
 
 // petit échappement pour les valeurs mises dans des attributs HTML
 function escAttr(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
@@ -1581,7 +1586,7 @@ function tournamentSectionHTML(){
   const bpCustom = t.best_player && !BEST_PLAYERS.includes(t.best_player);
   const status = locked
     ? `<span style="color:var(--red);font-weight:700">Pronos verrouillés 🔒</span>`
-    : `Modifiable jusqu'au coup d'envoi (11 juin)${daysToKickoff()>0?` · J-${daysToKickoff()}`:""}`;
+    : `Modifiable jusqu'au 11 juin, 20h (heure de Paris)${daysToLock()>0?` · J-${daysToLock()}`:""}`;
   return `<div class="panel" style="margin-bottom:18px">
     ${tournoiHead()}
     ${tournoiOpen?`<p class="sub" style="margin-top:10px">${status}</p>
@@ -1905,10 +1910,11 @@ function stageLabel(s){
 }
 // Verrouillage par match : modifiable seulement si TIMED et coup d'envoi (utcDate) pas encore passé.
 function apiMatchLocked(m){
-  if(m.status!=="TIMED")return true;
+  // commencé / fini / suspendu -> verrouillé
+  if(m.status && m.status!=="TIMED" && m.status!=="SCHEDULED")return true;
   const d=new Date(m.utcDate);
-  if(isNaN(d.getTime()))return new Date()>=KICKOFF; // garde-fou si date inconnue
-  return new Date()>=d;
+  if(isNaN(d.getTime()))return Date.now()>=TOURNAMENT_LOCK.getTime(); // garde-fou si date inconnue
+  return Date.now() >= d.getTime() - MATCH_LOCK_BEFORE_MS; // verrouillé dès 1 h avant le coup d'envoi
 }
 
 // --- CHAÎNES TV ---
@@ -1968,7 +1974,7 @@ function matchPronoRow(m){
     ? `<div class="scorebox"><span class="sc">${sc.home}</span><span>–</span><span class="sc">${sc.away}</span></div>`
     : `<div class="scorebox ${id===_blinkScore?'blink-score':''}" id="score-${id}">
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.a??''}" placeholder="–" ${dis} onchange="setProno('${id}','a',this.value)">
-        <span title="${locked?'Match commencé — prono verrouillé':''}">${locked?'🔒':'–'}</span>
+        <span title="${locked?'Prono verrouillé (1 h avant le match)':''}">${locked?'🔒':'–'}</span>
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.b??''}" placeholder="–" ${dis} onchange="setProno('${id}','b',this.value)">
       </div>`;
   return `<div class="prono">
@@ -2241,7 +2247,7 @@ function renderPronos(){
   view.innerHTML=hero+tournamentSectionHTML()+`
     <div class="panel">
       <h3>Pronos de match</h3>
-      <p class="sub">Score exact = 3 pts · bon résultat = 1 pt · 🔒 = match commencé</p>
+      <p class="sub">Score exact = 3 pts · bon résultat = 1 pt · 🔒 = verrouillé 1 h avant le coup d'envoi</p>
       ${pronoMatchesHTML()}
       <p class="sub" style="margin-top:16px;text-align:center">💾 Chaque prono est enregistré automatiquement dès que tu remplis les deux scores ✓</p>
     </div>`;
