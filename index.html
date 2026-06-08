@@ -908,7 +908,7 @@ function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",stat
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats",dashboard:"Dashboard admin"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -1087,6 +1087,7 @@ function renderAuth(){
           <button onclick="go('pronos')">🎯 Mes pronos</button>
           <button onclick="go('watchlist')">★ Ma watchlist</button>
           <button onclick="openOrgaManager()">➕ Créer ou rejoindre une orga</button>
+          ${state.user.id===ADMIN_ID?`<button onclick="go('dashboard')">📊 Dashboard admin</button>`:""}
           <button onclick="logout()">↩ Se déconnecter</button>
         </div>
       </div>`;
@@ -1459,7 +1460,7 @@ function dashHero(){
   const t=statsAt?statsAt.toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"}):"—";
   return `<div class="dashhead">
     <div><div class="kick" style="color:var(--blue)">Espace admin · privé</div><h2 class="dashtitle">Tableau de bord CM26</h2></div>
-    <div class="dashctl"><span class="dashupd">Maj : ${t}</span><button class="chip" onclick="refreshStats()">↻ Rafraîchir</button></div>
+    <div class="dashctl"><button class="chip" onclick="go('pronos')">← Retour au site</button><span class="dashupd">Maj : ${t}</span><button class="chip" onclick="refreshStats()">↻ Rafraîchir</button></div>
   </div>`;
 }
 function renderDashboard(){
