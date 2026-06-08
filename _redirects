@@ -1,0 +1,2 @@
+# /dashboard est une vue de la single-page : on sert index.html (rewrite, code 200)
+/dashboard /index.html 200
