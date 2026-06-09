@@ -580,6 +580,14 @@ footer b{color:var(--muted)}
   filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));transition:transform .15s}
 .hostband .hcountry:hover .hicon{transform:translateY(-2px) rotate(-4deg)}
 .hostsub{margin-top:12px;font-size:12px;color:var(--muted-2)}
+.hostlegal{margin-top:6px;font-size:11.5px}
+.hostlegal a{color:var(--muted-2);text-decoration:none;cursor:pointer}
+.hostlegal a:hover{color:var(--paper);text-decoration:underline}
+.legalpage{max-width:720px;margin:0 auto;line-height:1.6}
+.legalpage h3{font-family:'Archivo';font-weight:700;font-size:15px;margin:18px 0 6px;color:var(--paper)}
+.legalpage p,.legalpage li{font-size:14px;color:var(--muted)}
+.legalpage ul{margin:4px 0 4px 18px}
+.legalpage a{color:var(--blue)}
 .hostbtn{font-size:17px}
 .hostbtn:hover{border-color:var(--red);transform:translateY(-2px) rotate(9deg)}
 @media(max-width:430px){.hostbtn{display:none}}
@@ -798,6 +806,7 @@ footer b{color:var(--muted)}
       <span class="hcountry">🇨🇦 Canada <span class="hemo">🍁</span> <span class="hemo">🦫</span></span>
     </div>
     <div class="hostsub"><b>CM26</b> 🦅 — un projet entre amis · Diffusion FR : M6 (clair) + beIN Sports</div>
+    <div class="hostlegal"><a href="#" onclick="go('mentions');return false">Mentions légales</a> · <a href="#" onclick="go('confidentialite');return false">Confidentialité</a></div>
   </footer>
 </div>
 
@@ -908,7 +917,7 @@ function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",stat
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats",dashboard:"Dashboard admin"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats",dashboard:"Dashboard admin",mentions:"Mentions légales",confidentialite:"Confidentialité"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -1503,6 +1512,62 @@ function renderDashboard(){
   view.innerHTML=dashHero()+cardsHTML+`<div class="dashgrid">${inscChart}${traficChart}</div>`+warn;
 }
 
+/* ============================================================
+   PAGES LÉGALES (mentions légales + confidentialité)
+============================================================ */
+function legalRouteView(){
+  try{ const p=new URLSearchParams(location.search).get("p"); if(p==="mentions"||p==="confidentialite")return p; }catch(e){}
+  if(location.hash==="#mentions")return "mentions";
+  if(location.hash==="#confidentialite"||location.hash==="#privacy")return "confidentialite";
+  return null;
+}
+function legalBack(){ return `<button class="chip" onclick="go('pronos')">← Retour au site</button>`; }
+function renderMentions(){
+  view.innerHTML=`<div class="hero" style="padding:22px 24px"><div class="kick">Informations</div><h2 style="font-size:26px">Mentions légales</h2></div>
+  <div class="panel legalpage">
+    <p>${legalBack()}</p>
+    <h3>Éditeur</h3>
+    <p>Ce site, <b>CM26 — Le QG du Mondial</b>, est un projet <b>personnel, amateur et non commercial</b>, édité à titre privé par <b>Matthias</b> (WorkPlay). Contact : <a href="mailto:matthias@workplay.fr">matthias@workplay.fr</a>.</p>
+    <h3>Directeur de la publication</h3>
+    <p>Matthias.</p>
+    <h3>Hébergeur</h3>
+    <p>Le site est hébergé par <b>Cloudflare, Inc.</b> — 101 Townsend Street, San Francisco, CA 94107, États-Unis (<a href="https://www.cloudflare.com" target="_blank" rel="noopener">cloudflare.com</a>). La base de données et l'authentification sont fournies par <b>Supabase</b>.</p>
+    <h3>Nature du site</h3>
+    <p>CM26 est un jeu de pronostics entre amis autour de la Coupe du Monde 2026, <b>sans but lucratif</b>. Les « partenaires » affichés dans le bandeau sont un <b>clin d'œil humoristique</b> entre amis — il n'existe aucune relation commerciale ni rémunération. Les données sportives proviennent de l'API football-data.org et sont indicatives.</p>
+    <h3>Propriété</h3>
+    <p>Les logos et marques cités appartiennent à leurs propriétaires respectifs.</p>
+    <p style="margin-top:18px;color:var(--muted-2)">Dernière mise à jour : juin 2026.</p>
+    <p>${legalBack()}</p>
+  </div>`;
+}
+function renderPrivacy(){
+  view.innerHTML=`<div class="hero" style="padding:22px 24px"><div class="kick">Tes données</div><h2 style="font-size:26px">Politique de confidentialité</h2></div>
+  <div class="panel legalpage">
+    <p>${legalBack()}</p>
+    <p>CM26 respecte ta vie privée. Voici, simplement, ce qu'on collecte et pourquoi.</p>
+    <h3>Responsable</h3>
+    <p>Matthias — <a href="mailto:matthias@workplay.fr">matthias@workplay.fr</a>.</p>
+    <h3>Données collectées</h3>
+    <ul>
+      <li><b>Connexion</b> : via Google (e-mail, nom, photo de profil) <i>ou</i> par e-mail (lien de connexion).</li>
+      <li><b>Profil</b> : le pseudo que tu choisis.</li>
+      <li><b>Jeu</b> : tes pronostics (matchs + tournoi) et les ligues (« orgas ») que tu rejoins/crées.</li>
+    </ul>
+    <h3>Pourquoi</h3>
+    <p>Uniquement pour faire fonctionner le concours entre amis : t'identifier, afficher ton pseudo, calculer les classements et te regrouper en ligues. <b>Aucune revente, aucun usage commercial, aucune publicité ciblée.</b></p>
+    <h3>Où sont stockées tes données</h3>
+    <p>Dans <b>Supabase</b> (base de données), avec authentification via <b>Google</b>, le tout hébergé via <b>Cloudflare</b>. Selon ces prestataires, des données peuvent être traitées en dehors de l'Union européenne.</p>
+    <h3>Cookies & traceurs</h3>
+    <p>Pas de cookies publicitaires ni de pistage marketing. Ta session reste enregistrée localement (localStorage de ton navigateur) pour te garder connecté. Des statistiques de fréquentation <b>agrégées et anonymes</b> sont fournies par Cloudflare.</p>
+    <h3>Conservation</h3>
+    <p>Tes données sont conservées tant que tu utilises le site / le temps du concours, puis supprimées sur demande.</p>
+    <h3>Tes droits</h3>
+    <p>Tu peux demander à <b>consulter, corriger ou supprimer</b> tes données (accès, rectification, effacement, opposition) en écrivant à <a href="mailto:matthias@workplay.fr">matthias@workplay.fr</a>. La suppression de ton compte entraîne la suppression de tes pronostics.</p>
+    <p style="margin-top:18px;color:var(--muted-2)">Dernière mise à jour : juin 2026.</p>
+    <p>${legalBack()}</p>
+  </div>`;
+}
+
 function render(){
   const wl=document.getElementById("wlBadge");
   if(wl){const n=state.watch.length; wl.textContent=n; wl.style.display=n>0?"":"none";} // badge masqué si vide
@@ -1512,6 +1577,8 @@ function render(){
   if(state.view==="news")return renderNews();
   if(state.view==="groupes")return renderGroups();
   if(state.view==="dashboard")return renderDashboard();
+  if(state.view==="mentions")return renderMentions();
+  if(state.view==="confidentialite")return renderPrivacy();
 }
 
 /* ---------- WATCHLIST ---------- */
@@ -2814,6 +2881,7 @@ paintStars();
 })();
 
 if(isDashboardRoute())state.view="dashboard"; // page admin privée (sécurité re-vérifiée côté serveur)
+else { const _lv=legalRouteView(); if(_lv)state.view=_lv; } // pages légales via URL (?p=… ou #…)
 renderAuth();
 render();
 initSupabaseAuth(); // vérifie la session Google et met à jour le header
