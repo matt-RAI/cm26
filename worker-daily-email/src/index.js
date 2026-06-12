@@ -46,6 +46,8 @@ function parisDay() {
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
+// Pause (en ms) : on attend une promesse plutôt qu'un setTimeout "nu" (fiable dans un Worker).
+function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
 // Petit wrapper REST Supabase (clé service_role, serveur uniquement).
 function sb(base, service, path, init) {
   return fetch(base + "/rest/v1/" + path, {
@@ -110,19 +112,30 @@ async function runDailyEmail(env) {
   const members = await listMembers(SB, SERVICE);
   if (!members.length) return { error: "Aucun membre avec e-mail trouvé." };
 
-  // 4) Envoi via Resend, en parallèle, échecs isolés.
+  // 4) Envoi via Resend en respectant la limite Resend de 5 requêtes/seconde :
+  //    on envoie par LOTS de 5 (en parallèle dans le lot), avec une pause ~1,1 s
+  //    entre chaque lot. Ainsi on ne dépasse jamais 5 envois par seconde.
   const subject = "☀️ Morning Resumay — CM26";
-  const sends = await Promise.allSettled(members.map(m =>
-    sendEmail(RESEND, FROM, m.email, subject, emailHTML(m.pseudo, capsule, SITE))
-  ));
+  const BATCH = 5, PAUSE_MS = 1100;
   let ok = 0;
-  sends.forEach((s, i) => {
-    if (s.status === "fulfilled" && s.value.ok) ok++;
-    else if (s.status === "rejected") console.log("Échec envoi", members[i].email, String(s.reason));
-    else console.log("Resend a refusé", members[i].email, s.value.detail);
-  });
+  const echecs = [];
+  for (let i = 0; i < members.length; i += BATCH) {
+    const lot = members.slice(i, i + BATCH);
+    const res = await Promise.allSettled(lot.map(m =>
+      sendEmail(RESEND, FROM, m.email, subject, emailHTML(m.pseudo, capsule, SITE))
+    ));
+    res.forEach((s, j) => {
+      const email = lot[j].email;
+      if (s.status === "fulfilled" && s.value.ok) { ok++; return; }
+      const raison = s.status === "rejected" ? String(s.reason) : s.value.detail;
+      echecs.push({ email, raison });
+      console.log("Échec envoi", email, raison); // visible via `wrangler tail`
+    });
+    // Pause entre les lots (pas après le dernier) pour rester sous 5/s.
+    if (i + BATCH < members.length) await delay(PAUSE_MS);
+  }
 
-  return { day, destinataires: members.length, envoyes: ok, echecs: members.length - ok };
+  return { day, destinataires: members.length, envoyes: ok, echecs: echecs.length, details_echecs: echecs };
 }
 
 // Récupère les membres : e-mails via l'API admin Auth, pseudos via la table profiles.
@@ -154,18 +167,25 @@ async function listMembers(base, service) {
 }
 
 // Envoie un e-mail via Resend. Renvoie {ok:true} ou {ok:false, detail}.
+// Filet de sécurité : si on prend quand même un 429 (rate limit), on attend ~1,1 s
+// et on réessaie UNE fois.
 async function sendEmail(apiKey, from, to, subject, html) {
-  try {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [to], reply_to: "cm26@workplay.fr", subject, html })
-    });
-    if (!r.ok) return { ok: false, detail: (await r.text()).slice(0, 200) };
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, detail: String(e) };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [to], reply_to: "cm26@workplay.fr", subject, html })
+      });
+      if (r.ok) return { ok: true };
+      if (r.status === 429 && attempt === 1) { await delay(1100); continue; } // rate limit -> on réessaie
+      return { ok: false, detail: "HTTP " + r.status + " " + (await r.text()).slice(0, 160) };
+    } catch (e) {
+      if (attempt === 1) { await delay(1100); continue; }
+      return { ok: false, detail: String(e) };
+    }
   }
+  return { ok: false, detail: "échec après retry" };
 }
 
 // Gabarit HTML de l'e-mail (tables + styles inline = compatible clients mail).
