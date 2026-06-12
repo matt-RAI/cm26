@@ -415,6 +415,11 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .grow:first-of-type{border-top:none}
 .grow .nm{font-size:14px;font-weight:500}
 .grow .seed{font-family:'DM Mono';font-size:10px;color:var(--muted-2);margin-left:auto}
+/* classement vivant : rang (gauche) + points + différence de buts (droite) */
+.grow .grk{font-family:'DM Mono';font-size:11px;color:var(--muted-2);width:15px;text-align:center;flex:none}
+.grow .gpts{margin-left:auto;font-family:'DM Mono';font-size:12px;color:var(--muted);white-space:nowrap}
+.grow .gpts b{font-size:14px;font-weight:700;color:var(--paper)}
+.grow .gdiff{font-family:'DM Mono';font-size:11px;color:var(--muted-2);width:32px;text-align:right;flex:none}
 
 /* ---------- PRONOS ---------- */
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
@@ -2686,6 +2691,28 @@ function renderNews(){
 /* ---------- GROUPES ---------- */
 let grpTab="groupes"; // sous-vue de l'onglet "Groupes & Résultats"
 function setGrpTab(v){grpTab=v;render()}
+// Calcule, par équipe (code du site), points et buts depuis les matchs de poule
+// TERMINÉS (3 pts victoire, 1 nul, 0 défaite). Renvoie { CODE: {pts, gf, ga, pl} }.
+// Les équipes sans match joué n'apparaissent pas (=> traitées comme 0 au rendu).
+function computeGroupStats(){
+  const stats={};
+  (apiMatches||[]).forEach(m=>{
+    if(m.stage!=="GROUP_STAGE")return;
+    const ft=m.score&&m.score.fullTime;
+    if(!(m.status==="FINISHED" && ft && ft.home!=null && ft.away!=null))return;
+    const ch=teamCode(m.homeTeam), ca=teamCode(m.awayTeam);
+    const h=Number(ft.home), a=Number(ft.away);
+    if(!ch||!ca || ![h,a].every(Number.isFinite))return;
+    const sh=stats[ch]||(stats[ch]={pts:0,gf:0,ga:0,pl:0});
+    const sa=stats[ca]||(stats[ca]={pts:0,gf:0,ga:0,pl:0});
+    sh.gf+=h; sh.ga+=a; sh.pl++;
+    sa.gf+=a; sa.ga+=h; sa.pl++;
+    if(h>a){sh.pts+=3}
+    else if(a>h){sa.pts+=3}
+    else {sh.pts++; sa.pts++}
+  });
+  return stats;
+}
 function renderGroups(){
   const sub=`<div style="display:flex;gap:8px;margin-bottom:16px">
     <button class="chip ${grpTab==='groupes'?'on':''}" onclick="setGrpTab('groupes')">Groupes</button>
@@ -2703,16 +2730,26 @@ function renderGroups(){
     return;
   }
 
-  // --- Sous-vue GROUPES (par défaut) ---
+  // --- Sous-vue GROUPES (par défaut) : classement vivant (points + diff de buts) ---
+  ensureApiMatches();               // charge les matchs si besoin (re-render auto au retour)
+  const gstats=computeGroupStats(); // points/diff par équipe, calculés depuis les résultats
   let html=`${resumayHTML()}<div class="hero" style="padding:24px 26px">
     <div class="kick">Tirage officiel · 5 décembre 2025</div>
     <h2 style="font-size:28px">Les 12 groupes</h2>
-    <p>Les 2 premiers de chaque poule + les 8 meilleurs 3<sup>es</sup> filent en 16<sup>es</sup>. 32 rescapés.</p>
+    <p>Classement en direct : points et différence de buts, recalculés à chaque résultat. Les 2 premiers + les 8 meilleurs 3<sup>es</sup> filent en 16<sup>es</sup>.</p>
   </div>`+sub+`<div class="groupgrid">`;
   Object.keys(GROUPS).forEach((g,i)=>{
+    // Une ligne par équipe, triée par POINTS puis DIFF de buts (ordre du tirage en dernier recours).
+    const rows=GROUPS[g].map((code,seed0)=>{
+      const s=gstats[code]||{pts:0,gf:0,ga:0,pl:0};
+      return {code, seed0, pts:s.pts, diff:s.gf-s.ga};
+    }).sort((a,b)=> b.pts-a.pts || b.diff-a.diff || a.seed0-b.seed0);
     html+=`<div class="gcard" style="animation-delay:${i*.03}s">
       <h4><span class="gl">${g}</span> Groupe ${g}</h4>
-      ${GROUPS[g].map((c,j)=>`<div class="grow">${flagHTML(c)}<span class="nm">${nm(c)}</span><span class="seed">${j+1}</span></div>`).join("")}
+      ${rows.map((r,rank)=>{
+        const ds=(r.diff>0?"+":"")+r.diff; // ex. +3, 0, -2
+        return `<div class="grow"><span class="grk">${rank+1}</span>${flagHTML(r.code)}<span class="nm">${nm(r.code)}</span><span class="gpts"><b>${r.pts}</b> pts</span><span class="gdiff">${ds}</span></div>`;
+      }).join("")}
     </div>`;
   });
   html+=`</div>`;view.innerHTML=html;
