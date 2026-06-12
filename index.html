@@ -2773,11 +2773,12 @@ tickCD();setInterval(tickCD,30000);
 
 /* ============================================================
    IA — l'Aigle 🦅  (Claude)  — MORNING RESUMAY
-   La capsule est générée chaque matin CÔTÉ SERVEUR par la fonction Netlify
-   planifiée « netlify/functions/resumay.js » (clé API Anthropic en variable
-   d'environnement, JAMAIS dans le navigateur). Cette fonction écrit le texte
-   dans Supabase (table « resumay »). Ici, le site se contente de LIRE la
-   dernière capsule. Tant qu'aucune n'existe, on affiche une vanne locale.
+   La capsule est générée CÔTÉ SERVEUR par la fonction Cloudflare
+   « functions/api/resumay.js » (clé API Anthropic en variable d'environnement
+   Cloudflare, JAMAIS dans le navigateur). Génération « première visite du jour »,
+   1x/jour max, stockée dans Supabase (table « resumay »). Ici, le site se contente
+   de LIRE via GET /api/resumay. Tant qu'aucune capsule n'existe, on affiche une
+   vanne locale (fbPreview / SEED_PREVIEW).
 ============================================================ */
 function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
@@ -2877,21 +2878,20 @@ function resumayHTML(){
     </div>
   </div>`;
 }
-// Lit la dernière capsule générée côté serveur (table Supabase « resumay ») et l'affiche.
-// Appelée au démarrage ; ne génère RIEN dans le navigateur.
+// Lit la dernière capsule via /api/resumay (fonction Cloudflare). Cet appel, en plus de
+// renvoyer le texte, déclenche côté serveur la génération du jour si besoin (1x/jour max).
+// Ne génère JAMAIS rien dans le navigateur (la clé IA reste côté serveur).
 async function loadResumay(){
-  if(!supabase) return;
   try{
-    const {data,error}=await supabase
-      .from("resumay").select("text,created_at")
-      .order("created_at",{ascending:false}).limit(1);
-    if(error) throw error;
-    if(data && data.length){
-      state.resumay={date:new Date(data[0].created_at).getTime(),text:data[0].text};
+    const res=await fetch("/api/resumay");
+    if(!res.ok) return;
+    const data=await res.json().catch(()=>null);
+    if(data && data.text){
+      state.resumay={date:Date.now(),text:data.text};
       store.set("cm26_resumay",state.resumay);
       render();
     }
-  }catch(e){ console.error("Chargement Morning Resumay échoué",e); }
+  }catch(e){ /* silencieux : on garde le repli local */ }
 }
 // Bouton ↻ : recharge simplement la dernière capsule depuis Supabase
 // (la génération se fait automatiquement chaque matin côté serveur).
