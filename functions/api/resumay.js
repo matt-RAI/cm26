@@ -45,13 +45,24 @@ const SYSTEM =
   "du jour de la Coupe du Monde 2026. Écris un mini-résumé fluide de 4 à 6 phrases " +
   "(max 110 mots) qui décrypte l'actu avec vraie expertise ET humour absurde : commente les " +
   "scores marquants, glisse une vanne ciblée, salue un exploit ou moque une déroute, tease " +
-  "une affiche du jour. Termine par une punchline. Pas de liste, pas de titre, pas d'emoji.";
+  "une affiche du jour. Termine par une punchline. Pas de liste, pas de titre, pas d'emoji. " +
+  "IMPORTANT (heure) : chaque affiche à venir est fournie avec son heure réelle de Paris. " +
+  "N'invente JAMAIS le moment de la journée : n'écris pas \"ce matin\" pour un match qui se " +
+  "joue l'après-midi ou le soir. Soit tu cites l'heure exacte (ex. \"à 21h\"), soit tu situes " +
+  "correctement d'après l'heure fournie (matin avant 12h, après-midi 12h-18h, soir après 18h), " +
+  "soit tu dis simplement \"aujourd'hui\". La capsule est lue le matin mais parle des matchs à venir dans la journée.";
 
 // Date du jour "AAAA-MM-JJ" au fuseau de Paris (clé d'unicité de la capsule).
 function parisDay() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
 }
 function teamName(t) { return (t && (t.shortName || t.name)) || "?"; }
+// Heure de Paris "HHhMM" d'un match (depuis utcDate), pour situer correctement les affiches.
+function parisHour(utc) {
+  try {
+    return new Date(utc).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", "h");
+  } catch (e) { return ""; }
+}
 
 // Petit wrapper REST Supabase avec la clé service_role (serveur uniquement).
 function sb(service, path, init) {
@@ -98,7 +109,10 @@ async function buildContext(origin) {
     let day = "";
     try { day = new Date(m.utcDate).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }); } catch (e) {}
     return day === today;
-  }).map(m => `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}`);
+  }).map(m => {
+    const h = parisHour(m.utcDate);
+    return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (à ${h}, heure de Paris)` : "");
+  });
 
   let ctx = "";
   if (results.length) ctx += "Résultats récents (Coupe du Monde 2026) :\n" + results.join("\n") + "\n\n";
