@@ -431,6 +431,24 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .scorebox input:focus{border-color:var(--grass)}
 .scorebox span{color:var(--muted-2);font-weight:700}
 .scorebox .sc{font-family:'DM Mono';font-weight:700;font-size:20px;color:var(--paper)}
+/* Match terminé : score réel étiqueté + bandeau "ton prono + points" */
+.scorebox.done{flex-direction:column;gap:1px}
+.scorebox.done .sclab{font-size:9px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted-2);font-weight:700}
+.scorebox.done .scrow{display:flex;align-items:center;gap:6px}
+/* Prono en lecture seule (match en cours) */
+.pronoview{display:flex;align-items:center;gap:6px;justify-content:center}
+.pronoview .pv{font-family:'DM Mono';font-weight:700;font-size:20px;color:var(--paper)}
+.pronoview .lk{font-size:13px}
+.pronoview .nopr{font-size:12px;color:var(--muted-2);font-style:italic}
+/* Bandeau plein-largeur sous un match (prono + points, ou "en cours") */
+.presult{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:12.5px}
+.presult .rlab{color:var(--muted-2)}
+.presult .rpv{font-family:'DM Mono';font-weight:700;color:var(--paper)}
+.presult .nopr,.presult .live{color:var(--muted-2);font-style:italic}
+.ptsbadge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2)}
+.ptsbadge.g3{color:#34c77b;border-color:#34c77b}
+.ptsbadge.g1{color:#e3a534;border-color:#e3a534}
+.ptsbadge.g0{color:var(--muted-2)}
 .prono .pmeta{grid-column:1/-1;font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
 .prono .pmeta .pacts{display:flex;gap:6px;margin-left:6px}
 .iconbtn.sm{width:30px;height:30px;border-radius:9px;font-size:14px}
@@ -1859,6 +1877,24 @@ function computePoints(matchPreds, resultsByMatch, tourPred){
   return pts;
 }
 
+// Points d'UN match pour l'affichage d'une carte (même règle que computePoints) :
+// 3 = score exact, 1 = bon résultat (1/N/2), 0 = raté. Renvoie null si prono ou
+// résultat incomplet/invalide (-> "pas de prono"). Ne sert qu'à l'affichage, pas au classement.
+function matchPoints(ph,pa,rh,ra){
+  if(ph==null||pa==null||rh==null||ra==null)return null;
+  ph=Number(ph);pa=Number(pa);rh=Number(rh);ra=Number(ra);
+  if(![ph,pa,rh,ra].every(Number.isFinite))return null;
+  if(ph===rh && pa===ra)return 3;                      // score exact
+  if(Math.sign(ph-pa)===Math.sign(rh-ra))return 1;     // bon résultat (1/N/2)
+  return 0;
+}
+// Badge coloré des points d'un match : vert (+3), orange (+1), gris (0).
+function ptsBadge(pts){
+  if(pts===3)return `<span class="ptsbadge g3">+3 pts</span>`;
+  if(pts===1)return `<span class="ptsbadge g1">+1 pt</span>`;
+  return `<span class="ptsbadge g0">0 pt</span>`;
+}
+
 let lbCache=null;     // { profiles, pointsByUser, membersByOrga }
 let lbLoading=false;
 
@@ -2181,26 +2217,55 @@ function matchActions(m){
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button>`;
 }
 
-// Ligne d'un match de poule (avec champs de prono ou score réel).
+// Ligne d'un match de poule. Trois cas :
+//  - TERMINÉ (FINISHED + score réel connu) : score réel + ton prono + points gagnés, bien labellisés.
+//  - EN COURS (IN_PLAY/PAUSED, ou fini sans résultat encore) : ton prono en lecture seule + "résultat à venir".
+//  - À VENIR (TIMED/SCHEDULED) : champs de saisie du prono (verrouillés 1 h avant le coup d'envoi). Inchangé.
 function matchPronoRow(m){
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const id=String(m.id);
   const p=state.pronos[id]||{};
   const sc=(m.score&&m.score.fullTime)||{};
   const hasScore=sc.home!=null && sc.away!=null;
-  const locked=apiMatchLocked(m);
-  const dis=locked?"disabled":"";
-  const middle=hasScore
-    ? `<div class="scorebox"><span class="sc">${sc.home}</span><span>–</span><span class="sc">${sc.away}</span></div>`
-    : `<div class="scorebox ${id===_blinkScore?'blink-score':''}" id="score-${id}">
+  const hasProno=p.a!=null && p.b!=null;
+  const finished=m.status==="FINISHED" && hasScore;       // terminé, résultat réel connu
+  const started=m.status==="IN_PLAY"||m.status==="PAUSED"||(m.status==="FINISHED"&&!hasScore); // commencé, pas (encore) de résultat affichable
+
+  let middle, strip="";
+  if(finished){
+    // Case du milieu = SCORE RÉEL, clairement étiqueté.
+    middle=`<div class="scorebox done">
+        <span class="sclab">Score réel</span>
+        <div class="scrow"><span class="sc">${sc.home}</span><span>–</span><span class="sc">${sc.away}</span></div>
+      </div>`;
+    // Bandeau plein-largeur sous le match : TON prono + points gagnés (visuellement distinct du score réel).
+    if(hasProno){
+      const pts=matchPoints(p.a,p.b,sc.home,sc.away);
+      strip=`<div class="presult"><span class="rlab">Ton prono :</span><span class="rpv">${p.a}–${p.b}</span>${ptsBadge(pts)}</div>`;
+    }else{
+      strip=`<div class="presult"><span class="nopr">Pas de prono · 0 pt</span></div>`;
+    }
+  }else if(started){
+    // Match commencé : ton prono en lecture seule (verrouillé), pas de points tant que pas de résultat.
+    middle=hasProno
+      ? `<div class="scorebox"><div class="pronoview" title="Prono verrouillé"><span class="pv">${p.a}</span><span>–</span><span class="pv">${p.b}</span><span class="lk">🔒</span></div></div>`
+      : `<div class="scorebox"><div class="pronoview"><span class="nopr">Pas de prono</span><span class="lk">🔒</span></div></div>`;
+    strip=`<div class="presult"><span class="live">⏳ Match en cours · résultat à venir</span></div>`;
+  }else{
+    // Match à venir : saisie du prono (inchangé).
+    const locked=apiMatchLocked(m);
+    const dis=locked?"disabled":"";
+    middle=`<div class="scorebox ${id===_blinkScore?'blink-score':''}" id="score-${id}">
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.a??''}" placeholder="–" ${dis} onchange="setProno('${id}','a',this.value)">
         <span title="${locked?'Prono verrouillé (1 h avant le match)':''}">${locked?'🔒':'–'}</span>
         <input type="number" inputmode="numeric" min="0" max="20" value="${p.b??''}" placeholder="–" ${dis} onchange="setProno('${id}','b',this.value)">
       </div>`;
+  }
   return `<div class="prono">
     <div class="pside">${home.flag}<span class="nm">${home.name}</span></div>
     ${middle}
     <div class="pside r">${away.flag}<span class="nm">${away.name}</span></div>
+    ${strip}
     <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)} ${channelBadges(m)}
       <span class="pstat" id="pstat-${id}"></span>
       <span class="pacts">${matchActions(m)}</span></div>
