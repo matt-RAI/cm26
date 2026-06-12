@@ -46,11 +46,15 @@ const SYSTEM =
   "(max 110 mots) qui décrypte l'actu avec vraie expertise ET humour absurde : commente les " +
   "scores marquants, glisse une vanne ciblée, salue un exploit ou moque une déroute, tease " +
   "une affiche du jour. Termine par une punchline. Pas de liste, pas de titre, pas d'emoji. " +
-  "IMPORTANT (heure) : chaque affiche à venir est fournie avec son heure réelle de Paris. " +
-  "N'invente JAMAIS le moment de la journée : n'écris pas \"ce matin\" pour un match qui se " +
-  "joue l'après-midi ou le soir. Soit tu cites l'heure exacte (ex. \"à 21h\"), soit tu situes " +
-  "correctement d'après l'heure fournie (matin avant 12h, après-midi 12h-18h, soir après 18h), " +
-  "soit tu dis simplement \"aujourd'hui\". La capsule est lue le matin mais parle des matchs à venir dans la journée.";
+  "IMPORTANT (temporalité) — on te donne DEUX listes avec les heures réelles de Paris. " +
+  "(1) Les matchs DÉJÀ JOUÉS sont des RÉSULTATS : certains ont eu lieu cette nuit. Tu peux dire " +
+  "\"cette nuit\" pour un match nocturne (vers 0h-6h), \"hier soir\" pour un match en soirée, " +
+  "en cohérence avec l'heure fournie ; ne les présente JAMAIS comme \"à venir\". Si le score " +
+  "n'est pas confirmé, n'en invente pas. " +
+  "(2) Les matchs À VENIR se jouent plus tard aujourd'hui : cite l'heure exacte (\"ce soir à 21h\", " +
+  "\"cet après-midi à 15h\") d'après l'heure fournie. N'écris JAMAIS \"ce matin\" pour un match " +
+  "de l'après-midi ou du soir. La capsule est lue le matin (~8h) : ne confonds pas le moment de " +
+  "lecture avec l'heure réelle des matchs.";
 
 // Date du jour "AAAA-MM-JJ" au fuseau de Paris (clé d'unicité de la capsule).
 function parisDay() {
@@ -94,30 +98,40 @@ async function buildContext(origin) {
     matches = Array.isArray(d.matches) ? d.matches : [];
   } catch (e) { matches = []; }
 
-  const today = parisDay();
-  const since = Date.now() - 30 * 60 * 60 * 1000; // ~30 h en arrière (hier soir + nuit)
+  // On catégorise par l'HEURE RÉELLE : coup d'envoi (utcDate) AVANT / APRÈS maintenant.
+  const now = Date.now();
+  const since = now - 30 * 60 * 60 * 1000; // ~30 h en arrière (hier soir + nuit déjà joués)
+  const until = now + 24 * 60 * 60 * 1000; // prochaines ~24 h (affiches à venir)
+  const kickoff = m => { const t = new Date(m.utcDate).getTime(); return isFinite(t) ? t : NaN; };
 
-  const results = matches.filter(m => {
-    const ft = m && m.score && m.score.fullTime;
-    if (!(m.status === "FINISHED" && ft && ft.home != null && ft.away != null)) return false;
-    const t = new Date(m.utcDate).getTime();
-    return isFinite(t) && t >= since;
-  }).map(m => `${teamName(m.homeTeam)} ${m.score.fullTime.home}-${m.score.fullTime.away} ${teamName(m.awayTeam)}`);
+  // PASSÉS = coup d'envoi déjà passé. Vrai score si dispo (FINISHED) ; sinon, prudence.
+  const played = matches
+    .filter(m => { const t = kickoff(m); return isFinite(t) && t < now && t >= since; })
+    .sort((a, b) => kickoff(a) - kickoff(b))
+    .map(m => {
+      const h = parisHour(m.utcDate);
+      const ft = m && m.score && m.score.fullTime;
+      const hasScore = m.status === "FINISHED" && ft && ft.home != null && ft.away != null;
+      if (hasScore) {
+        return `${teamName(m.homeTeam)} ${ft.home}-${ft.away} ${teamName(m.awayTeam)}` + (h ? ` (joué à ${h}, heure de Paris)` : " (joué)");
+      }
+      // Coup d'envoi passé mais score pas encore confirmé : on le signale SANS inventer.
+      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (coup d'envoi à ${h}, score pas encore confirmé)` : " (score pas encore confirmé)");
+    });
 
-  const todays = matches.filter(m => {
-    if (m.status === "FINISHED") return false;
-    let day = "";
-    try { day = new Date(m.utcDate).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" }); } catch (e) {}
-    return day === today;
-  }).map(m => {
-    const h = parisHour(m.utcDate);
-    return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (à ${h}, heure de Paris)` : "");
-  });
+  // À VENIR = coup d'envoi après maintenant, dans les ~24 h. Heure réelle de Paris.
+  const upcoming = matches
+    .filter(m => { const t = kickoff(m); return isFinite(t) && t >= now && t <= until; })
+    .sort((a, b) => kickoff(a) - kickoff(b))
+    .map(m => {
+      const h = parisHour(m.utcDate);
+      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (à ${h}, heure de Paris)` : "");
+    });
 
   let ctx = "";
-  if (results.length) ctx += "Résultats récents (Coupe du Monde 2026) :\n" + results.join("\n") + "\n\n";
-  if (todays.length)  ctx += "Affiches à suivre aujourd'hui :\n" + todays.join("\n") + "\n\n";
-  if (!ctx) ctx = "Aucun match terminé récemment et aucune affiche aujourd'hui en Coupe du Monde 2026. Fais une courte capsule de réveil pleine d'humour qui fait patienter les fans.\n\n";
+  if (played.length)   ctx += "Matchs DÉJÀ JOUÉS (résultats à raconter ; certains ont eu lieu cette nuit) — Coupe du Monde 2026 :\n" + played.join("\n") + "\n\n";
+  if (upcoming.length) ctx += "Matchs À VENIR aujourd'hui (à teaser, heures réelles de Paris) :\n" + upcoming.join("\n") + "\n\n";
+  if (!ctx) ctx = "Aucun match récemment joué et aucune affiche dans les prochaines 24 h en Coupe du Monde 2026. Fais une courte capsule de réveil pleine d'humour qui fait patienter les fans.\n\n";
   return ctx;
 }
 
