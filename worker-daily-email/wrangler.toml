@@ -1,0 +1,39 @@
+# ============================================================
+# Cloudflare WORKER séparé — e-mail quotidien "Morning Resumay" CM26.
+#
+# Pourquoi un Worker et pas une Pages Function ?
+#   Les Cron Triggers ne sont pas fiables sur Cloudflare PAGES Functions.
+#   Sur les Cloudflare WORKERS, ils marchent vraiment. Ce Worker est donc
+#   DÉPLOYÉ À PART du site (le site Pages continue normalement, intact).
+#
+# Déploiement (depuis ce dossier worker-daily-email/) :
+#   npx wrangler login            # une fois, ouvre le navigateur
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE
+#   npx wrangler secret put RESUMAY_CRON_SECRET     # optionnel (voir ci-dessous)
+#   npx wrangler deploy
+# ============================================================
+
+name = "cm26-daily-email"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+# Cron : 6h00 UTC chaque jour = 8h00 Paris en heure d'été (le Mondial est en juin/juillet).
+[triggers]
+crons = ["0 6 * * *"]
+
+# Variables NON secrètes (publiques). Les SECRETS se mettent via `wrangler secret put`,
+# JAMAIS ici (ce fichier est versionné sur GitHub).
+[vars]
+SUPABASE_URL = "https://rmlzmsywimctqzypzget.supabase.co"
+SITE_URL = "https://cm26.workplay.fr"
+MAIL_FROM = "CM26 <cm26@workplay.fr>"
+
+# Secrets attendus (définis hors de ce fichier) :
+#   RESEND_API_KEY         → clé Resend (envoi des e-mails)
+#   SUPABASE_SERVICE_ROLE  → clé Supabase service_role (liste des membres + flag emailed_at)
+#   RESUMAY_CRON_SECRET    → OPTIONNEL : active le déclenchement manuel (test) via URL,
+#                            et, s'il est aussi défini sur les Pages, sert à appeler
+#                            /api/resumay?generate=1 (mettre la MÊME valeur des deux côtés).
+# NB : ce Worker n'a PAS besoin d'ANTHROPIC_API_KEY — la génération IA reste côté Pages
+#      (/api/resumay), que ce Worker se contente d'appeler.
