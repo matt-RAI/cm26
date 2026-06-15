@@ -46,15 +46,15 @@ const SYSTEM =
   "(max 110 mots) qui décrypte l'actu avec vraie expertise ET humour absurde : commente les " +
   "scores marquants, glisse une vanne ciblée, salue un exploit ou moque une déroute, tease " +
   "une affiche du jour. Termine par une punchline. Pas de liste, pas de titre, pas d'emoji. " +
-  "IMPORTANT (temporalité) — on te donne DEUX listes avec les heures réelles de Paris. " +
-  "(1) Les matchs DÉJÀ JOUÉS sont des RÉSULTATS : certains ont eu lieu cette nuit. Tu peux dire " +
-  "\"cette nuit\" pour un match nocturne (vers 0h-6h), \"hier soir\" pour un match en soirée, " +
-  "en cohérence avec l'heure fournie ; ne les présente JAMAIS comme \"à venir\". Si le score " +
-  "n'est pas confirmé, n'en invente pas. " +
-  "(2) Les matchs À VENIR se jouent plus tard aujourd'hui : cite l'heure exacte (\"ce soir à 21h\", " +
-  "\"cet après-midi à 15h\") d'après l'heure fournie. N'écris JAMAIS \"ce matin\" pour un match " +
-  "de l'après-midi ou du soir. La capsule est lue le matin (~8h) : ne confonds pas le moment de " +
-  "lecture avec l'heure réelle des matchs.";
+  "IMPORTANT (temporalité) — on te donne DEUX listes, et CHAQUE match porte un repère temporel " +
+  "explicite (ex. « cette nuit à 04h00 », « hier soir à 21h00 », « ce soir à 21h00 »). UTILISE ce " +
+  "repère tel quel : ne le déduis pas, ne l'invente pas. " +
+  "(1) Les matchs DÉJÀ JOUÉS sont des RÉSULTATS : commente-les EN PRIORITÉ, surtout ceux de la nuit " +
+  "et d'hier soir (c'est le cœur du résumé du matin) ; ne les présente JAMAIS comme « à venir », et " +
+  "si un score est marqué « pas encore confirmé », n'en invente aucun. " +
+  "(2) Les matchs À VENIR se jouent plus tard : tease-les avec leur repère (« ce soir à 21h », etc.). " +
+  "N'écris JAMAIS « ce matin » pour un match qui n'est pas indiqué « ce matin ». La capsule est lue " +
+  "vers 8h : ne confonds pas le moment de lecture avec l'heure réelle des matchs.";
 
 // Date du jour "AAAA-MM-JJ" au fuseau de Paris (clé d'unicité de la capsule).
 function parisDay() {
@@ -66,6 +66,31 @@ function parisHour(utc) {
   try {
     return new Date(utc).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", "h");
   } catch (e) { return ""; }
+}
+// Seuil du matin (Paris) : on ne génère pas la capsule du jour avant cette heure, pour
+// qu'elle inclue les résultats de la nuit et pas une version trop précoce (ex. à 1h).
+const MORNING_CUTOFF_MIN = 7 * 60 + 30; // 7h30
+// Minutes depuis minuit, heure de Paris.
+function parisMinutes(ms) {
+  const s = new Date(ms == null ? Date.now() : ms).toLocaleTimeString("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false });
+  const p = s.split(":").map(Number);
+  return p[0] * 60 + p[1];
+}
+// Repère temporel clair d'un match par rapport à "maintenant" (ex. "cette nuit",
+// "hier soir", "ce soir"). Empêche l'IA de confondre un match d'hier/avant-hier
+// avec "ce matin".
+function whenLabel(utc, nowMs) {
+  let md, nd, hour;
+  try {
+    md = new Date(utc).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    nd = new Date(nowMs).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+    hour = Number(new Date(utc).toLocaleTimeString("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hour12: false }));
+  } catch (e) { return ""; }
+  const diff = Math.round((Date.parse(nd) - Date.parse(md)) / 86400000); // >0 = passé (jours)
+  if (diff <= -1) return hour < 7 ? "cette nuit" : "demain";              // futur (autre jour)
+  if (diff === 0) return hour < 7 ? "cette nuit" : hour < 12 ? "ce matin" : hour < 18 ? "cet après-midi" : "ce soir";
+  if (diff === 1) return hour >= 18 ? "hier soir" : hour >= 12 ? "hier après-midi" : hour < 7 ? "la nuit dernière" : "hier";
+  return "avant-hier";
 }
 
 // Petit wrapper REST Supabase avec la clé service_role (serveur uniquement).
@@ -99,38 +124,42 @@ async function buildContext(origin) {
   } catch (e) { matches = []; }
 
   // On catégorise par l'HEURE RÉELLE : coup d'envoi (utcDate) AVANT / APRÈS maintenant.
+  // Fenêtre "résultats" resserrée à ~24 h (hier + la nuit) : alignée sur la cadence
+  // quotidienne, elle exclut les matchs de l'avant-veille (ex. le match d'ouverture).
   const now = Date.now();
-  const since = now - 30 * 60 * 60 * 1000; // ~30 h en arrière (hier soir + nuit déjà joués)
+  const since = now - 24 * 60 * 60 * 1000; // ~24 h en arrière (hier + cette nuit)
   const until = now + 24 * 60 * 60 * 1000; // prochaines ~24 h (affiches à venir)
   const kickoff = m => { const t = new Date(m.utcDate).getTime(); return isFinite(t) ? t : NaN; };
+  // "cette nuit à 04h00", "hier soir à 21h00", "ce soir à 21h00"…
+  const quandLabel = m => [whenLabel(m.utcDate, now), parisHour(m.utcDate) ? "à " + parisHour(m.utcDate) : ""].filter(Boolean).join(" ");
 
   // PASSÉS = coup d'envoi déjà passé. Vrai score si dispo (FINISHED) ; sinon, prudence.
   const played = matches
     .filter(m => { const t = kickoff(m); return isFinite(t) && t < now && t >= since; })
     .sort((a, b) => kickoff(a) - kickoff(b))
     .map(m => {
-      const h = parisHour(m.utcDate);
+      const quand = quandLabel(m);
       const ft = m && m.score && m.score.fullTime;
       const hasScore = m.status === "FINISHED" && ft && ft.home != null && ft.away != null;
       if (hasScore) {
-        return `${teamName(m.homeTeam)} ${ft.home}-${ft.away} ${teamName(m.awayTeam)}` + (h ? ` (joué à ${h}, heure de Paris)` : " (joué)");
+        return `${teamName(m.homeTeam)} ${ft.home}-${ft.away} ${teamName(m.awayTeam)}` + (quand ? ` (${quand})` : "");
       }
       // Coup d'envoi passé mais score pas encore confirmé : on le signale SANS inventer.
-      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (coup d'envoi à ${h}, score pas encore confirmé)` : " (score pas encore confirmé)");
+      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (quand ? ` (${quand}, vient de se jouer, score pas encore confirmé)` : " (score pas encore confirmé)");
     });
 
-  // À VENIR = coup d'envoi après maintenant, dans les ~24 h. Heure réelle de Paris.
+  // À VENIR = coup d'envoi après maintenant, dans les ~24 h.
   const upcoming = matches
     .filter(m => { const t = kickoff(m); return isFinite(t) && t >= now && t <= until; })
     .sort((a, b) => kickoff(a) - kickoff(b))
     .map(m => {
-      const h = parisHour(m.utcDate);
-      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (h ? ` (à ${h}, heure de Paris)` : "");
+      const quand = quandLabel(m);
+      return `${teamName(m.homeTeam)} - ${teamName(m.awayTeam)}` + (quand ? ` (${quand})` : "");
     });
 
   let ctx = "";
-  if (played.length)   ctx += "Matchs DÉJÀ JOUÉS (résultats à raconter ; certains ont eu lieu cette nuit) — Coupe du Monde 2026 :\n" + played.join("\n") + "\n\n";
-  if (upcoming.length) ctx += "Matchs À VENIR aujourd'hui (à teaser, heures réelles de Paris) :\n" + upcoming.join("\n") + "\n\n";
+  if (played.length)   ctx += "Matchs DÉJÀ JOUÉS (RÉSULTATS à raconter ; le repère temporel de chaque match est fourni, ex. « cette nuit », « hier soir ») — Coupe du Monde 2026 :\n" + played.join("\n") + "\n\n";
+  if (upcoming.length) ctx += "Matchs À VENIR (à teaser ; repère temporel fourni, ex. « ce soir », « cette nuit ») :\n" + upcoming.join("\n") + "\n\n";
   if (!ctx) ctx = "Aucun match récemment joué et aucune affiche dans les prochaines 24 h en Coupe du Monde 2026. Fais une courte capsule de réveil pleine d'humour qui fait patienter les fans.\n\n";
   return ctx;
 }
@@ -168,6 +197,12 @@ async function generateToday(context, opts) {
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: "ANTHROPIC_API_KEY absente côté serveur." };
   const day = parisDay();
+
+  // Seuil du matin : avant 7h30 (Paris), on NE génère PAS (sauf force=, pour les tests),
+  // pour que la capsule inclue les résultats de la nuit et pas une version trop précoce.
+  if (!force && parisMinutes() < MORNING_CUTOFF_MIN) {
+    return { skipped: true, reason: "trop tôt (avant 7h30 Paris) — génération différée." };
+  }
 
   if (force) {
     await sb(service, "resumay?day=eq." + day, { method: "DELETE", headers: { "Prefer": "return=minimal" } });
