@@ -464,6 +464,17 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .pstat.ok{color:var(--grass);font-weight:600}
 .pstat.err{color:var(--red)}
 .mdh{font-family:'Archivo';font-weight:700;font-size:14px;margin:18px 0 6px;color:var(--muted)}
+/* Bloc dépliable "Résultats passés" : on referme les matchs déjà joués, ouvrable au clic */
+.pastwrap{margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+.pastwrap summary.pastsum{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-family:'Archivo';font-weight:700;font-size:13px;color:var(--muted);padding:11px 14px;border:1px solid var(--line);
+  border-radius:12px;background:var(--panel-2);user-select:none;transition:.15s}
+.pastwrap summary.pastsum:hover{border-color:var(--line-2);color:var(--paper)}
+.pastwrap summary.pastsum::-webkit-details-marker{display:none}
+.pastwrap summary.pastsum::before{content:"▸";color:var(--muted-2);font-size:12px;transition:transform .15s}
+.pastwrap[open] summary.pastsum::before{transform:rotate(90deg)}
+.pastwrap .pasthint{font-weight:500;font-size:11px;color:var(--muted-2);margin-left:auto}
+.pastwrap[open] summary.pastsum{margin-bottom:8px}
 .secthead{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none}
 .secchev{display:flex;align-items:center;color:var(--muted);transition:transform .25s}
 .secchev.up{transform:rotate(180deg)}
@@ -2372,23 +2383,34 @@ function matchListHTML(rowFn, finalsNote){
   if(pronoFilter.chaine!=="all"){const ch=m=>channelsFor(m).includes(pronoFilter.chaine);groups=groups.filter(ch);finals=finals.filter(ch)}
   groups=groups.filter(teamMatch);finals=finals.filter(teamMatch);
 
+  // Les matchs TERMINÉS (anciens) partent dans un bloc dépliable "Résultats passés"
+  // (fermé par défaut) ; les matchs à venir / en cours restent affichés.
+  const isOld=m=>m && m.status==="FINISHED";
+
   let html=banner+pronoFilterBar();
-  let listed=0;
+  let upcomingCount=0, pastCount=0, pastHTML="";
   const byDay={};
   groups.forEach(m=>{const d=m.matchday||0;(byDay[d]=byDay[d]||[]).push(m)});
   Object.keys(byDay).map(Number).sort((a,b)=>a-b).forEach(d=>{
     const ms=byDay[d].sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-    listed+=ms.length;
-    html+=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`+ms.map(rowFn).join("");
+    const head=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`;
+    const up=ms.filter(m=>!isOld(m)), old=ms.filter(isOld);
+    if(up.length){ html+=head+up.map(rowFn).join(""); upcomingCount+=up.length; }
+    if(old.length){ pastHTML+=head+old.map(rowFn).join(""); pastCount+=old.length; }
   });
   if(finals.length){
     finals.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-    listed+=finals.length;
-    html+=`<h4 class="mdh">Phase finale</h4>
-      <p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`
-      +finals.map(finalRow).join("");
+    const up=finals.filter(m=>!isOld(m)), old=finals.filter(isOld);
+    if(up.length){ html+=`<h4 class="mdh">Phase finale</h4>
+      <p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`+up.map(finalRow).join(""); upcomingCount+=up.length; }
+    if(old.length){ pastHTML+=`<h4 class="mdh">Phase finale</h4>`+old.map(finalRow).join(""); pastCount+=old.length; }
   }
-  if(!listed)html+=emptyState("🔍","Aucun match","Aucun match ne correspond à tes filtres.");
+  // Bloc dépliable : fermé par défaut, mais ouvert d'office s'il n'y a rien d'autre à montrer.
+  if(pastCount){
+    const open=upcomingCount===0?" open":"";
+    html+=`<details class="pastwrap"${open}><summary class="pastsum">🗂️ Résultats passés · ${pastCount} match${pastCount>1?"s":""}<span class="pasthint">cliquer pour ouvrir/fermer</span></summary>${pastHTML}</details>`;
+  }
+  if(!upcomingCount && !pastCount)html+=emptyState("🔍","Aucun match","Aucun match ne correspond à tes filtres.");
   return html;
 }
 function pronoMatchesHTML(){ return matchListHTML(matchPronoRow, "Équipes à déterminer · pronos de phase finale à venir."); }
