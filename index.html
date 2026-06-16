@@ -506,6 +506,13 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
   border-radius:9px;cursor:pointer;font-size:16px;display:grid;place-items:center}
 .modal h3{font-family:'Archivo';font-weight:700;font-size:20px;letter-spacing:-.4px;margin-bottom:4px}
 .modal .msub{color:var(--muted);font-size:13.5px;margin-bottom:20px}
+/* Modale d'annonce des nouveautés */
+.newslist{list-style:none;margin:0 0 20px;display:flex;flex-direction:column;gap:11px}
+.newslist li{font-size:13.5px;line-height:1.45;color:var(--muted)}
+.newslist li b{color:var(--paper)}
+.newsbtn{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;font-family:'Archivo';
+  font-weight:700;font-size:15px;padding:13px;cursor:pointer;transition:.15s}
+.newsbtn:hover{background:#ff4659;transform:translateY(-1px)}
 .matchprev{background:var(--ink-2);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:18px;
   display:flex;align-items:center;justify-content:center;gap:14px}
 .matchprev .mp-t{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
@@ -858,6 +865,11 @@ footer b{color:var(--muted)}
 <!-- AUTH MODAL -->
 <div class="overlay" id="authOverlay">
   <div class="modal" id="authModal" style="max-width:400px"></div>
+</div>
+
+<!-- NEWS MODAL (annonce des nouveautés, fermable définitivement) -->
+<div class="overlay" id="newsOverlay">
+  <div class="modal" id="newsModal"></div>
 </div>
 
 <div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
@@ -3039,10 +3051,35 @@ paintStars();
   document.head.appendChild(link);
 })();
 
+/* ---- Modale d'annonce des nouveautés (fermable définitivement) ---- */
+// Bumper NEWS_VERSION pour ré-afficher une NOUVELLE annonce à tout le monde.
+const NEWS_VERSION="2026-06-16";
+function maybeShowNews(){
+  try{ if(store.get("cm26_news_seen","")===NEWS_VERSION)return; }catch(e){}
+  const ov=document.getElementById("newsOverlay"), md=document.getElementById("newsModal");
+  if(!ov||!md)return;
+  md.innerHTML=`<h3>🦅 Du nouveau sur CM26 !</h3>
+    <p class="msub">Quelques nouveautés viennent d'arriver :</p>
+    <ul class="newslist">
+      <li><b>🎯 Bonus Outsider</b> — ose les pronos à contre-courant : <b>+5</b> si tu es le seul à voir juste, <b>+2</b> en minorité (à partir d'aujourd'hui).</li>
+      <li><b>🗂️ Résultats passés repliés</b> — les matchs déjà joués sont rangés dans un bloc dépliable, en haut des listes.</li>
+      <li><b>📊 Classement des groupes en direct</b> — points et différence de buts qui se mettent à jour selon les résultats.</li>
+      <li><b>☀️ Morning Resumay par mail</b> — chaque matin, le résumé de la nuit directement dans ta boîte.</li>
+    </ul>
+    <button class="newsbtn" onclick="dismissNews()">✓ J'ai compris, ne plus afficher</button>`;
+  ov.classList.add("on");
+}
+function dismissNews(){
+  try{ store.set("cm26_news_seen",NEWS_VERSION); }catch(e){}
+  const ov=document.getElementById("newsOverlay");
+  if(ov)ov.classList.remove("on");
+}
+
 if(isDashboardRoute())state.view="dashboard"; // page admin privée (sécurité re-vérifiée côté serveur)
 else { const _lv=legalRouteView(); if(_lv)state.view=_lv; } // pages légales via URL (?p=… ou #…)
 renderAuth();
 render();
+maybeShowNews();    // modale "nouveautés" au premier chargement (jusqu'au clic "J'ai compris")
 initSupabaseAuth(); // vérifie la session Google et met à jour le header
 syncResults();      // synchro auto des résultats au chargement (non bloquant)
 // navigation historique : état de base pour le bouton "Précédent"
