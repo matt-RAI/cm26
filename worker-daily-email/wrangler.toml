@@ -18,9 +18,9 @@ name = "cm26-daily-email"
 main = "src/index.js"
 compatibility_date = "2026-06-01"
 
-# Cron : 6h00 UTC chaque jour = 8h00 Paris en heure d'été (le Mondial est en juin/juillet).
+# Cron : 5h00 UTC chaque jour = 7h00 Paris en heure d'été (le Mondial est en juin/juillet).
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 5 * * *"]
 
 # Variables NON secrètes (publiques). Les SECRETS se mettent via `wrangler secret put`,
 # JAMAIS ici (ce fichier est versionné sur GitHub).
