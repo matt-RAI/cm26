@@ -465,7 +465,7 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .pstat.err{color:var(--red)}
 .mdh{font-family:'Archivo';font-weight:700;font-size:14px;margin:18px 0 6px;color:var(--muted)}
 /* Bloc dépliable "Résultats passés" : on referme les matchs déjà joués, ouvrable au clic */
-.pastwrap{margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+.pastwrap{margin:2px 0 16px}
 .pastwrap summary.pastsum{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   font-family:'Archivo';font-weight:700;font-size:13px;color:var(--muted);padding:11px 14px;border:1px solid var(--line);
   border-radius:12px;background:var(--panel-2);user-select:none;transition:.15s}
@@ -2383,33 +2383,35 @@ function matchListHTML(rowFn, finalsNote){
   if(pronoFilter.chaine!=="all"){const ch=m=>channelsFor(m).includes(pronoFilter.chaine);groups=groups.filter(ch);finals=finals.filter(ch)}
   groups=groups.filter(teamMatch);finals=finals.filter(teamMatch);
 
-  // Les matchs TERMINÉS (anciens) partent dans un bloc dépliable "Résultats passés"
-  // (fermé par défaut) ; les matchs à venir / en cours restent affichés.
+  // Les matchs TERMINÉS (anciens) vont dans un bloc dépliable "Résultats passés",
+  // placé EN HAUT (juste sous les filtres) et FERMÉ par défaut : on le déroule d'un clic.
   const isOld=m=>m && m.status==="FINISHED";
 
-  let html=banner+pronoFilterBar();
-  let upcomingCount=0, pastCount=0, pastHTML="";
+  let upHTML="", pastHTML="", upcomingCount=0, pastCount=0;
   const byDay={};
   groups.forEach(m=>{const d=m.matchday||0;(byDay[d]=byDay[d]||[]).push(m)});
   Object.keys(byDay).map(Number).sort((a,b)=>a-b).forEach(d=>{
     const ms=byDay[d].sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
     const head=`<h4 class="mdh">Journée ${d} · phase de groupes</h4>`;
     const up=ms.filter(m=>!isOld(m)), old=ms.filter(isOld);
-    if(up.length){ html+=head+up.map(rowFn).join(""); upcomingCount+=up.length; }
+    if(up.length){ upHTML+=head+up.map(rowFn).join(""); upcomingCount+=up.length; }
     if(old.length){ pastHTML+=head+old.map(rowFn).join(""); pastCount+=old.length; }
   });
   if(finals.length){
     finals.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
     const up=finals.filter(m=>!isOld(m)), old=finals.filter(isOld);
-    if(up.length){ html+=`<h4 class="mdh">Phase finale</h4>
+    if(up.length){ upHTML+=`<h4 class="mdh">Phase finale</h4>
       <p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`+up.map(finalRow).join(""); upcomingCount+=up.length; }
     if(old.length){ pastHTML+=`<h4 class="mdh">Phase finale</h4>`+old.map(finalRow).join(""); pastCount+=old.length; }
   }
-  // Bloc dépliable : fermé par défaut, mais ouvert d'office s'il n'y a rien d'autre à montrer.
+  // Bloc dépliable des résultats passés : fermé par défaut (ouvert d'office s'il n'y a aucun
+  // match à venir à afficher). Placé EN HAUT pour qu'on le trouve et le déroule facilement.
+  let pastBlock="";
   if(pastCount){
     const open=upcomingCount===0?" open":"";
-    html+=`<details class="pastwrap"${open}><summary class="pastsum">🗂️ Résultats passés · ${pastCount} match${pastCount>1?"s":""}<span class="pasthint">cliquer pour ouvrir/fermer</span></summary>${pastHTML}</details>`;
+    pastBlock=`<details class="pastwrap"${open}><summary class="pastsum">🗂️ Voir les ${pastCount} match${pastCount>1?"s":""} déjà joué${pastCount>1?"s":""}<span class="pasthint">résultats passés</span></summary><div class="pastbody">${pastHTML}</div></details>`;
   }
+  let html=banner+pronoFilterBar()+pastBlock+upHTML;
   if(!upcomingCount && !pastCount)html+=emptyState("🔍","Aucun match","Aucun match ne correspond à tes filtres.");
   return html;
 }
