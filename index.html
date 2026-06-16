@@ -1874,8 +1874,17 @@ async function saveTournament(){
 // Tant qu'elles sont null -> 0 pt pour la partie "tournoi".
 const REAL_CHAMPION=null, REAL_TOP_SCORER=null, REAL_BEST_PLAYER=null;
 
-// Barème : matchs (3 exact / 1 bon résultat) + bonus tournoi (15/10/10).
-function computePoints(matchPreds, resultsByMatch, tourPred){
+// Bonus "Outsider" : récompense un prono à contre-courant qui réussit (peu de joueurs
+// avaient vu juste). NON rétroactif : seuls les matchs dont le coup d'envoi est >= cette
+// date sont concernés (1er match : France-Sénégal, 16/06/2026 21h Paris).
+const OUTSIDER_FROM = "2026-06-16T12:00:00Z";
+const OUTSIDER_MIN_VOTERS = 5;   // bonus actif seulement si >= 5 joueurs ont pronostiqué le match
+const OUTSIDER_SOLO = 5;          // +5 si tu étais le SEUL à avoir le bon résultat
+const OUTSIDER_MINORITY = 2;      // +2 si tu étais en minorité (<= 1/3 des pronostiqueurs)
+
+// Barème : matchs (3 exact / 1 bon résultat) + bonus Outsider + bonus tournoi (15/10/10).
+// outsiderByMatch : { match_id(texte) -> bonus à ajouter à CHAQUE joueur ayant le bon résultat }.
+function computePoints(matchPreds, resultsByMatch, tourPred, outsiderByMatch){
   let pts=0;
   (matchPreds||[]).forEach(p=>{
     const r=resultsByMatch[String(p.match_id)];                      // rapprochement par match_id (texte)
@@ -1883,8 +1892,10 @@ function computePoints(matchPreds, resultsByMatch, tourPred){
     if(p.pred_home==null||p.pred_away==null||r.real_home==null||r.real_away==null)return;
     const ph=Number(p.pred_home), pa=Number(p.pred_away), rh=Number(r.real_home), ra=Number(r.real_away);
     if(![ph,pa,rh,ra].every(Number.isFinite))return;                 // valeurs invalides -> on ignore
+    const okResult=Math.sign(ph-pa)===Math.sign(rh-ra);              // bon résultat (1/N/2) ?
     if(ph===rh && pa===ra){pts+=3}                                   // score exact
-    else if(Math.sign(ph-pa)===Math.sign(rh-ra)){pts+=1}             // bon résultat (1/N/2)
+    else if(okResult){pts+=1}                                        // bon résultat
+    if(okResult)pts += (outsiderByMatch && outsiderByMatch[String(p.match_id)]) || 0; // bonus Outsider
   });
   if(tourPred){
     if(REAL_CHAMPION && tourPred.champion===REAL_CHAMPION)pts+=15;
@@ -1920,6 +1931,7 @@ async function loadLeaderboard(){
   if(!supabase||lbLoading)return;
   lbLoading=true;
   try{
+    if(!apiMatches) await loadApiMatches(); // pour connaître l'heure des matchs (seuil Outsider)
     const orgaIds=(state.orgas||[]).map(o=>o.id);
     const memQ=orgaIds.length
       ? supabase.from("orga_members").select("orga_id,user_id").in("orga_id",orgaIds)
@@ -1947,9 +1959,33 @@ async function loadLeaderboard(){
     (mp.data||[]).forEach(p=>{(matchByUser[p.user_id]=matchByUser[p.user_id]||[]).push(p)});
     const tourByUser={};
     (tp.data||[]).forEach(t=>{tourByUser[t.user_id]=t});
+
+    // --- Bonus Outsider : par match terminé ÉLIGIBLE (coup d'envoi >= OUTSIDER_FROM), on compte
+    //     le nb de votants (n) et de joueurs ayant eu le bon résultat (k), d'où le bonus. ---
+    const utcById={};
+    (apiMatches||[]).forEach(m=>{ if(m && m.id!=null) utcById[String(m.id)]=m.utcDate; });
+    const voters={}; // match_id -> { n: total votants, k: ont eu le bon résultat }
+    (mp.data||[]).forEach(p=>{
+      const r=results[String(p.match_id)];
+      if(!r||p.pred_home==null||p.pred_away==null||r.real_home==null||r.real_away==null)return;
+      const ph=Number(p.pred_home),pa=Number(p.pred_away),rh=Number(r.real_home),ra=Number(r.real_away);
+      if(![ph,pa,rh,ra].every(Number.isFinite))return;
+      const v=voters[String(p.match_id)]||(voters[String(p.match_id)]={n:0,k:0});
+      v.n++; if(Math.sign(ph-pa)===Math.sign(rh-ra))v.k++;
+    });
+    const outsiderByMatch={};
+    Object.keys(voters).forEach(key=>{
+      const utc=utcById[key];
+      if(!utc || new Date(utc).getTime() < new Date(OUTSIDER_FROM).getTime())return; // pas rétroactif
+      const {n,k}=voters[key];
+      if(n<OUTSIDER_MIN_VOTERS || k===0)return;             // match trop peu joué, ou personne n'a vu juste
+      if(k===1)outsiderByMatch[key]=OUTSIDER_SOLO;          // le seul -> +5
+      else if(k<=n/3)outsiderByMatch[key]=OUTSIDER_MINORITY; // minorité -> +2
+    });
+
     const pointsByUser={};
     (pf.data||[]).forEach(prof=>{
-      pointsByUser[prof.id]=computePoints(matchByUser[prof.id]||[], results, tourByUser[prof.id]||null);
+      pointsByUser[prof.id]=computePoints(matchByUser[prof.id]||[], results, tourByUser[prof.id]||null, outsiderByMatch);
     });
     const membersByOrga={};
     (mem.data||[]).forEach(m=>{(membersByOrga[m.orga_id]=membersByOrga[m.orga_id]||new Set()).add(m.user_id)});
@@ -2007,7 +2043,7 @@ function renderClassement(){
   const hero=`<div class="hero" style="padding:24px 26px">
     <div class="kick">Le concours entre amis 🦅</div>
     <h2 style="font-size:28px">Classement 🏆</h2>
-    <p>Score exact <b style="color:var(--red)">3 pts</b>, bon résultat <b style="color:var(--blue)">1 pt</b>. Bonus tournoi : champion <b>15</b>, meilleur buteur <b>10</b>, meilleur joueur <b>10</b>.</p>
+    <p>Score exact <b style="color:var(--red)">3 pts</b>, bon résultat <b style="color:var(--blue)">1 pt</b>. <b>🎯 Bonus Outsider</b> (dès le 16/06) : bon résultat alors que peu y croyaient → <b>+5</b> si tu étais le seul, <b>+2</b> en minorité. Bonus tournoi : champion <b>15</b>, buteur <b>10</b>, joueur <b>10</b>.</p>
   </div>`;
 
   if(!state.user){
