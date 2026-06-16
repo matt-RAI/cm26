@@ -69,7 +69,7 @@ function parisHour(utc) {
 }
 // Seuil du matin (Paris) : on ne génère pas la capsule du jour avant cette heure, pour
 // qu'elle inclue les résultats de la nuit et pas une version trop précoce (ex. à 1h).
-const MORNING_CUTOFF_MIN = 7 * 60 + 30; // 7h30
+const MORNING_CUTOFF_MIN = 6 * 60 + 45; // 6h45 (marge avant le mail de 7h)
 // Minutes depuis minuit, heure de Paris.
 function parisMinutes(ms) {
   const s = new Date(ms == null ? Date.now() : ms).toLocaleTimeString("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false });
