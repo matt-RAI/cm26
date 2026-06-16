@@ -91,21 +91,37 @@ async function runDailyEmail(env) {
   }
   if (!capsule) return { error: "Pas de capsule disponible pour " + day + " (génération échouée ?)." };
 
-  // 2) Anti-doublon ATOMIQUE : on réclame l'envoi du jour (emailed_at NULL -> maintenant).
-  //    Si aucune ligne renvoyée -> déjà envoyé aujourd'hui -> on s'arrête.
-  let claimed = [];
+  // 2) VERROU atomique (anti-doublon) AVEC réessai possible en cas d'échec :
+  //    - emailed_at   = SUCCÈS confirmé (posé seulement à la fin si l'envoi a réussi).
+  //    - email_lock_at = verrou "en cours" (TTL ~10 min) : empêche deux exécutions
+  //      simultanées d'envoyer en même temps, sans bloquer un réessai si ça échoue.
+  //    On prend le verrou si la journée n'est PAS déjà confirmée envoyée ET qu'aucun
+  //    verrou frais n'existe (vide, ou périmé -> exécution précédente plantée).
+  const LOCK_TTL_MS = 10 * 60 * 1000;
+  const lockCutoff = new Date(Date.now() - LOCK_TTL_MS).toISOString();
+  let locked;
   try {
-    const claim = await sb(SB, SERVICE, "resumay?day=eq." + day + "&emailed_at=is.null", {
-      method: "PATCH",
-      headers: { "Prefer": "return=representation" },
-      body: JSON.stringify({ emailed_at: new Date().toISOString() })
-    });
-    claimed = await claim.json().catch(() => []);
+    const lock = await sb(
+      SB, SERVICE,
+      "resumay?day=eq." + day + "&emailed_at=is.null&or=(email_lock_at.is.null,email_lock_at.lt." + lockCutoff + ")",
+      {
+        method: "PATCH",
+        headers: { "Prefer": "return=representation" },
+        body: JSON.stringify({ email_lock_at: new Date().toISOString() })
+      }
+    );
+    if (!lock.ok) {
+      return { error: "Prise de verrou refusée (HTTP " + lock.status + "). La colonne email_lock_at existe-t-elle ? Lance le SQL." };
+    }
+    locked = await lock.json().catch(() => null);
   } catch (e) {
-    return { error: "Échec de la réservation anti-doublon : " + String(e) };
+    return { error: "Échec de la prise de verrou : " + String(e) };
   }
-  if (!Array.isArray(claimed) || claimed.length === 0) {
-    return { skipped: true, reason: "e-mail déjà envoyé aujourd'hui (" + day + ")." };
+  if (!Array.isArray(locked)) {
+    return { error: "Verrou : réponse inattendue (colonne email_lock_at manquante ? Lance le SQL)." };
+  }
+  if (locked.length === 0) {
+    return { skipped: true, reason: "déjà envoyé aujourd'hui, ou un envoi est déjà en cours (" + day + ")." };
   }
 
   // 3) Liste des membres (e-mails + pseudos).
@@ -135,7 +151,63 @@ async function runDailyEmail(env) {
     if (i + BATCH < members.length) await delay(PAUSE_MS);
   }
 
-  return { day, destinataires: members.length, envoyes: ok, echecs: echecs.length, details_echecs: echecs };
+  // 5) BILAN : on ne CONFIRME la journée (emailed_at) que si l'essentiel est passé.
+  //    Seuil = au moins la MOITIÉ des destinataires (sinon un réessai re-spammerait
+  //    ceux qui ont déjà reçu). Sous ce seuil -> on libère le verrou pour réessayer.
+  const total = members.length;
+  const success = ok > 0 && ok * 2 >= total; // >= 50 % reçus
+  try {
+    if (success) {
+      // Confirmé envoyé -> emailed_at posé -> plus jamais de réessai (donc pas de doublon).
+      await sb(SB, SERVICE, "resumay?day=eq." + day, {
+        method: "PATCH", headers: { "Prefer": "return=minimal" },
+        body: JSON.stringify({ emailed_at: new Date().toISOString() })
+      });
+    } else {
+      // Échec majoritaire -> on LIBÈRE le verrou (emailed_at reste NULL) -> un prochain
+      // déclenchement (cron de demain, ou manuel) réessaiera.
+      await sb(SB, SERVICE, "resumay?day=eq." + day, {
+        method: "PATCH", headers: { "Prefer": "return=minimal" },
+        body: JSON.stringify({ email_lock_at: null })
+      });
+    }
+  } catch (e) {
+    console.log("Bilan : écriture du statut échouée", String(e));
+  }
+
+  // 6) ALERTE admin si au moins un envoi a échoué (pour ne plus découvrir la panne en retard).
+  if (echecs.length > 0) {
+    await sendAlert(RESEND, FROM, day, total, ok, echecs);
+  }
+
+  return { day, destinataires: total, envoyes: ok, echecs: echecs.length, confirme: success, details_echecs: echecs };
+}
+
+// Alerte admin (Resend) en cas d'échec d'envoi. Si Resend est lui-même injoignable,
+// on logue clairement (visible avec `wrangler tail`).
+async function sendAlert(apiKey, from, day, total, ok, echecs) {
+  const ADMIN = "matthias@workplay.fr";
+  const ko = echecs.length;
+  const first = echecs[0] ? echecs[0].raison : "(inconnue)";
+  const resume = day + " · " + ok + "/" + total + " envoyés · " + ko + " échec(s) · 1re raison : " + first;
+  const subject = "⚠️ CM26 — e-mail du matin : " + ko + " échec(s) le " + day;
+  const html =
+    "<p>L'envoi du Morning Resumay du <b>" + esc(day) + "</b> a rencontré des échecs.</p>" +
+    "<ul><li>Destinataires : " + total + "</li><li>Envoyés : " + ok + "</li>" +
+    "<li>Échecs : " + ko + "</li><li>1re raison : " + esc(first) + "</li></ul>" +
+    "<p>" + (ok * 2 >= total
+      ? "Majorité envoyée : journée confirmée (pas de réessai)."
+      : "Échec majoritaire : la journée sera réessayée au prochain déclenchement.") + "</p>";
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [ADMIN], reply_to: ADMIN, subject, html })
+    });
+    if (!r.ok) console.log("ALERTE non envoyée (Resend " + r.status + ") :", (await r.text()).slice(0, 160), "|", resume);
+  } catch (e) {
+    console.log("ALERTE non envoyée (Resend injoignable) :", String(e), "|", resume);
+  }
 }
 
 // Récupère les membres : e-mails via l'API admin Auth, pseudos via la table profiles.
