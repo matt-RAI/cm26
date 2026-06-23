@@ -495,6 +495,9 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .lead.me .nm{color:var(--grass)}
 .lead .pts{margin-left:auto;font-family:'DM Mono';font-weight:500;font-size:15px}
 .lead .pts small{color:var(--muted-2);font-size:11px}
+.lead.clk{cursor:pointer;border-radius:10px;padding-left:8px;padding-right:8px;margin:0 -8px;transition:background .15s}
+.lead.clk:hover,.lead.clk:focus-visible{background:var(--panel-2);outline:none}
+.lead .chev{flex:none;margin-left:10px;color:var(--muted-2);font-size:20px;line-height:1;font-weight:600}
 
 /* ---------- MODAL ---------- */
 .overlay{position:fixed;inset:0;z-index:100;background:rgba(4,8,5,.72);backdrop-filter:blur(6px);
@@ -949,6 +952,7 @@ let state={
   tournoi:store.get("cm26_tournoi",null), // { champion, top_scorer, best_player }
   lbScope:"general",                      // classement : "general" | "orga"
   lbOrga:null,                            // id de l'orga sélectionnée pour le classement
+  rivalId:null,                           // id du joueur dont on regarde les pronos passés (vue "rival")
   watch:store.get("tifo_watch",[]),
   pronos:store.get("tifo_pronos",{}),
   resumay:store.get("cm26_resumay",null),
@@ -963,7 +967,7 @@ function save(){store.set("tifo_watch",state.watch);store.set("tifo_pronos",stat
 const view=document.getElementById("view");
 const tabs=document.getElementById("tabs");
 tabs.addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)go(b.dataset.v)});
-const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",news:"News Fresh",groupes:"Groupes & Résultats",dashboard:"Dashboard admin",mentions:"Mentions légales",confidentialite:"Confidentialité"};
+const TAB_LABELS={watchlist:"Ma watchlist",pronos:"Matchs & Pronos",classement:"Classement",rival:"Pronos d'un joueur",news:"News Fresh",groupes:"Groupes & Résultats",dashboard:"Dashboard admin",mentions:"Mentions légales",confidentialite:"Confidentialité"};
 function toggleMenu(){
   document.getElementById("tabs").classList.toggle("open");
   document.getElementById("burger").classList.toggle("open");
@@ -1621,6 +1625,7 @@ function render(){
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
   if(state.view==="classement")return renderClassement();
+  if(state.view==="rival")return renderRival();
   if(state.view==="news")return renderNews();
   if(state.view==="groupes")return renderGroups();
   if(state.view==="dashboard")return renderDashboard();
@@ -2002,7 +2007,10 @@ async function loadLeaderboard(){
     const membersByOrga={};
     (mem.data||[]).forEach(m=>{(membersByOrga[m.orga_id]=membersByOrga[m.orga_id]||new Set()).add(m.user_id)});
 
-    lbCache={profiles:pf.data||[], pointsByUser, membersByOrga};
+    // On conserve aussi les pronos par joueur (matchByUser/tourByUser), les résultats et le bonus
+    // Outsider : c'est exactement ce qu'il faut pour afficher la fiche "pronos passés" d'un rival
+    // (renderRival) sans refaire de requête.
+    lbCache={profiles:pf.data||[], pointsByUser, membersByOrga, matchByUser, tourByUser, results, outsiderByMatch};
   }finally{
     lbLoading=false;
   }
@@ -2044,9 +2052,12 @@ function lbRows(allowedIds){
   return list.map((r,i)=>{
     const me=state.user && r.id===state.user.id;
     const rank=i<3?medals[i]:(i+1);
-    return `<div class="lead ${me?'me':''} ${i===0?'one':''}">
+    // Ligne cliquable : ouvre la fiche des pronos passés du joueur.
+    return `<div class="lead clk ${me?'me':''} ${i===0?'one':''}" role="button" tabindex="0"
+        title="Voir les pronos de ${escAttr(r.pseudo)}" onclick="openRival('${r.id}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRival('${r.id}')}">
       <div class="rk">${rank}</div><span class="nm">${r.pseudo}</span>
-      <span class="pts">${r.pts}<small> pts</small></span></div>`;
+      <span class="pts">${r.pts}<small> pts</small></span><span class="chev">›</span></div>`;
   }).join("");
 }
 
@@ -2140,6 +2151,108 @@ function renderClassement(){
 }
 
 /* ============================================================
+   FICHE D'UN JOUEUR — ses pronos PASSÉS + points gagnés
+   Accessible en cliquant une ligne du classement. Par souci d'équité,
+   on n'affiche QUE les matchs terminés (résultat connu) : impossible de
+   copier les pronos d'un match à venir.
+============================================================ */
+function openRival(id){
+  state.rivalId=id;
+  go("rival");
+}
+
+// Une ligne "match terminé" pour un rival : score réel + son prono + points gagnés.
+function rivalMatchRow(p, m, r){
+  const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
+  const rh=r.real_home, ra=r.real_away;
+  const ph=p.pred_home, pa=p.pred_away;
+  const hasProno = ph!=null && pa!=null;
+  const base = hasProno ? matchPoints(ph,pa,rh,ra) : null;
+  // bonus Outsider (même règle que le classement) : seulement si bon résultat.
+  const bonus = (base===3||base===1) ? ((lbCache.outsiderByMatch&&lbCache.outsiderByMatch[String(m.id)])||0) : 0;
+  let strip;
+  if(hasProno){
+    strip=`<div class="presult"><span class="rlab">Son prono :</span><span class="rpv">${ph}–${pa}</span>${ptsBadge(base)}${bonus?`<span class="ptsbadge g3" title="Bonus Outsider">🎯 +${bonus}</span>`:""}</div>`;
+  }else{
+    strip=`<div class="presult"><span class="nopr">Pas de prono · 0 pt</span></div>`;
+  }
+  return `<div class="prono">
+    <div class="pside">${home.flag}<span class="nm">${home.name}</span></div>
+    <div class="scorebox done"><span class="sclab">Score réel</span>
+      <div class="scrow"><span class="sc">${rh}</span><span>–</span><span class="sc">${ra}</span></div></div>
+    <div class="pside r">${away.flag}<span class="nm">${away.name}</span></div>
+    ${strip}
+    <div class="pmeta">${fmtParis(m.utcDate)} · ${statusBadge(m)}</div>
+  </div>`;
+}
+
+function renderRival(){
+  if(!state.user){ go("classement"); return; }
+  // Données pas encore chargées (accès direct / rafraîchissement) -> on (re)charge.
+  if(!lbCache){
+    if(supabase && !lbLoading)loadLeaderboard().then(()=>{if(state.view==="rival")render()});
+    view.innerHTML=`<div class="panel"><p class="sub">Chargement…</p></div>`;
+    return;
+  }
+  const id=state.rivalId;
+  const prof=(lbCache.profiles||[]).find(p=>p.id===id);
+  const back=`<button class="chip" style="margin-bottom:12px" onclick="go('classement')">← Retour au classement</button>`;
+  if(!prof){
+    view.innerHTML=back+`<div class="panel"><p class="sub">Joueur introuvable.</p></div>`;
+    return;
+  }
+  const pseudo=prof.pseudo||"—";
+  const me=id===state.user.id;
+  const total=lbCache.pointsByUser[id]||0;
+
+  // On a besoin des vrais matchs pour les noms d'équipes / dates.
+  if(!apiMatches){ ensureApiMatches(); }
+  const matchById={};
+  (apiMatches||[]).forEach(m=>{ if(m&&m.id!=null) matchById[String(m.id)]=m; });
+
+  // Pronos du joueur sur des matchs TERMINÉS (résultat connu), du plus récent au plus ancien.
+  const results=lbCache.results||{};
+  const preds=(lbCache.matchByUser&&lbCache.matchByUser[id])||[];
+  const rows=preds
+    .map(p=>{ const mid=String(p.match_id); return {p, m:matchById[mid], r:results[mid]}; })
+    .filter(x=>x.m && x.r)                                   // match connu ET terminé
+    .sort((a,b)=> new Date(b.m.utcDate)-new Date(a.m.utcDate));
+
+  const hero=`<div class="hero" style="padding:24px 26px">
+    <div class="kick">${me?"C'est toi 👋":"Pronos d'un concurrent 🔎"}</div>
+    <h2 style="font-size:28px">${escAttr(pseudo)}${me?" (toi)":""}</h2>
+    <p>Total au classement : <b style="color:var(--red)">${total} pts</b> · ${rows.length} match${rows.length>1?"s":""} terminé${rows.length>1?"s":""} pronostiqué${rows.length>1?"s":""}.</p>
+  </div>`;
+
+  // Pronos de tournoi (champion / buteur / joueur) — affichés s'ils existent.
+  const tp=(lbCache.tourByUser&&lbCache.tourByUser[id])||null;
+  let tourPanel="";
+  if(tp && (tp.champion||tp.top_scorer||tp.best_player)){
+    const line=(lab,val)=> val?`<div class="lead"><span class="nm">${lab}</span><span class="pts" style="font-size:14px">${escAttr(val)}</span></div>`:"";
+    tourPanel=`<div class="panel" style="margin-top:12px">
+      <h3>Ses pronos de tournoi</h3>
+      <p class="sub">Les points seront comptés à la fin du Mondial.</p>
+      ${line("🏆 Champion",tp.champion)}
+      ${line("👟 Meilleur buteur",tp.top_scorer)}
+      ${line("⭐ Meilleur joueur",tp.best_player)}
+    </div>`;
+  }
+
+  let body;
+  if(!rows.length){
+    body=`<div class="panel" style="margin-top:12px">${emptyState("⏳","Aucun prono passé","Ce joueur n'a pas encore de pronostic sur un match terminé. Reviens après les premiers résultats !")}</div>`;
+  }else{
+    body=`<div class="panel" style="margin-top:12px">
+      <h3>Ses pronos passés</h3>
+      <p class="sub">Score réel, son prono et points gagnés — uniquement les matchs terminés.</p>
+      ${rows.map(x=>rivalMatchRow(x.p,x.m,x.r)).join("")}
+    </div>`;
+  }
+
+  view.innerHTML=back+hero+tourPanel+body;
+}
+
+/* ============================================================
    VRAIS MATCHS — API football-data.org via une fonction serveur
    URL : /api/matches  (Cloudflare Pages ; redirigé aussi côté Netlify)
    La clé secrète reste côté serveur, jamais dans le navigateur.
@@ -2180,7 +2293,7 @@ async function loadApiMatches(force){
 function ensureApiMatches(){
   if(apiMatchesLoading || apiMatchesError)return;
   const stale=!apiMatches || (Date.now()-apiMatchesTs)>=API_TTL;
-  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos"||state.view==="watchlist"||state.view==="groupes")render()});
+  if(stale)loadApiMatches().then(()=>{if(state.view==="pronos"||state.view==="watchlist"||state.view==="groupes"||state.view==="rival")render()});
 }
 function reloadApiMatches(){apiMatchesError=null; loadApiMatches(true).then(()=>render())}
 
