@@ -54,7 +54,7 @@ body::after{
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23ffffff' opacity='0.025'%3E%3Cpath d='M40 18l3.5 7.5L51 27l-6 5 1.5 8L40 36l-6.5 4 1.5-8-6-5 7.5-1.5z'/%3E%3Cpath d='M120 90l3 6.5 6.5 1-5 4.3 1.3 6.9-5.8-3.4-5.8 3.4 1.3-6.9-5-4.3 6.5-1z'/%3E%3C/g%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 }
-.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 20px 120px}
+.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 20px 48px}
 
 /* --- stars & stripes top bar --- */
 .flagbar{position:relative;z-index:5;height:7px;width:100%;
@@ -183,54 +183,6 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
   font-family:'Archivo';font-weight:700;font-size:13px;color:var(--muted);
   background:var(--panel);border:1px dashed var(--line-2);border-radius:999px;padding:8px 16px;transition:.15s}
 .hero-collapsed:hover{border-color:var(--red);color:var(--paper);transform:translateY(-1px)}
-/* Bandeau LED "Partenaires officiels" */
-.ledbanner{display:flex;align-items:stretch;margin-bottom:24px;border-radius:14px;overflow:hidden;
-  background:linear-gradient(180deg,#0c1426,#070b16);border:1px solid var(--line-2);
-  box-shadow:0 0 0 1px rgba(47,107,255,.12),0 12px 32px -18px rgba(0,0,0,.85)}
-.ledlabel{flex:none;display:flex;align-items:center;text-align:center;padding:0 14px;max-width:118px;
-  font-family:'DM Mono';font-size:11px;font-weight:500;letter-spacing:1px;line-height:1.3;text-transform:uppercase;
-  color:var(--gold);background:linear-gradient(180deg,rgba(236,184,74,.16),rgba(236,184,74,.04));
-  border-right:1px solid rgba(236,184,74,.35)}
-.ledscroll{flex:1;overflow:hidden;position:relative}
-/* gag "Pringles" : panneau qui défile dans la bande (desktop + mobile) */
-.paidchip{display:flex;align-items:center}
-.paidchip .paidchiptext{font-family:'DM Mono';font-size:10px;font-weight:500;line-height:1.3;letter-spacing:.4px;
-  color:var(--gold);text-align:center;white-space:normal;max-width:150px;
-  border:1px dashed rgba(236,184,74,.4);border-radius:10px;padding:6px 11px;background:rgba(236,184,74,.07)}
-.ledtrack{display:flex;align-items:center;width:max-content;padding:10px 0;margin-left:24px;
-  animation:ledscrollanim 115s linear infinite}
-@keyframes ledscrollanim{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.ledbanner:hover .ledtrack{animation-play-state:paused}
-.sponsor{display:flex;flex-direction:column;align-items:center;gap:7px;text-decoration:none;flex:none;margin-right:30px}
-.spcard{background:#fff;border-radius:12px;padding:9px 16px;width:150px;height:74px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 14px -4px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.35)}
-.spcard img{height:56px;width:auto;max-width:100%;object-fit:contain;display:block}
-.spcard .spname{font-family:'Archivo';font-weight:800;font-size:18px;color:#0a1733}
-.sptag{font-family:'DM Mono';font-size:10.5px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;white-space:nowrap}
-@media(max-width:600px){
-  .ledtrack{margin-left:16px;padding:9px 0}
-  .sponsor{margin-right:20px;gap:5px}
-  .spcard{height:54px;width:118px;padding:7px 12px}
-  .spcard img{height:40px}
-  .spcard .spname{font-size:15px}
-  .ledlabel{font-size:9.5px;max-width:80px;padding:0 9px;letter-spacing:.6px}
-  .sptag{font-size:9px}
-}
-@media(prefers-reduced-motion:reduce){
-  .ledtrack{animation:none;margin-left:0}
-  .ledscroll{overflow-x:auto}
-}
-/* version FIXE en bas de page (panneau de stade) */
-.ledbar{position:fixed;left:0;right:0;bottom:0;z-index:90}
-.ledbar .ledbanner{margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;
-  box-shadow:0 -10px 30px -16px rgba(0,0,0,.85)}
-.ledbar .spcard{height:56px;padding:7px 14px;width:140px}
-.ledbar .spcard img{height:40px}
-@media(max-width:600px){
-  .ledbar .spcard{height:48px;width:104px;padding:6px 10px}
-  .ledbar .spcard img{height:34px}
-}
 .eaglebtn{background:var(--panel);border:1px solid var(--line);border-radius:11px;width:38px;height:38px;
   font-size:18px;cursor:pointer;transition:transform .15s,border-color .15s;line-height:1;flex:none}
 .eaglebtn:hover{border-color:var(--blue);transform:translateY(-2px) rotate(-9deg)}
@@ -637,11 +589,11 @@ footer b{color:var(--muted)}
 @media(max-width:430px){.hostbtn{display:none}}
 
 /* ============ RESPONSIVE / MOBILE-FIRST ============ */
-@media(max-width:900px){ .wrap{padding:0 16px 110px} }
+@media(max-width:900px){ .wrap{padding:0 16px 40px} }
 @media(max-width:760px){ .stars-side{width:60px;opacity:.4} }
 
 @media(max-width:640px){
-  .wrap{padding:0 13px 100px}
+  .wrap{padding:0 13px 36px}
   header{padding:15px 0 9px}
   .bar{gap:10px}
   .brand{gap:10px}
@@ -853,9 +805,6 @@ footer b{color:var(--muted)}
     <div class="hostlegal"><a href="#" onclick="go('mentions');return false">Mentions légales</a> · <a href="#" onclick="go('confidentialite');return false">Confidentialité</a></div>
   </footer>
 </div>
-
-<!-- BANDEAU LED FIXE (partenaires officiels) -->
-<div class="ledbar" id="ledbar"></div>
 
 <!-- MODE URGENCE : faux tableur plein écran (rempli par JS) -->
 <div class="sheet-overlay" id="sheetOverlay"></div>
@@ -1584,7 +1533,7 @@ function renderMentions(){
     <h3>Hébergeur</h3>
     <p>Le site est hébergé par <b>Cloudflare, Inc.</b> — 101 Townsend Street, San Francisco, CA 94107, États-Unis (<a href="https://www.cloudflare.com" target="_blank" rel="noopener">cloudflare.com</a>). La base de données et l'authentification sont fournies par <b>Supabase</b>.</p>
     <h3>Nature du site</h3>
-    <p>CM26 est un jeu de pronostics entre amis autour de la Coupe du Monde 2026, <b>sans but lucratif</b>. Les « partenaires » affichés dans le bandeau sont un <b>clin d'œil humoristique</b> entre amis — il n'existe aucune relation commerciale ni rémunération. Les données sportives proviennent de l'API football-data.org et sont indicatives.</p>
+    <p>CM26 est un jeu de pronostics entre amis autour de la Coupe du Monde 2026, <b>sans but lucratif</b>. Il n'existe aucune relation commerciale ni rémunération, ni publicité. Les données sportives proviennent de l'API football-data.org et sont indicatives.</p>
     <h3>Propriété</h3>
     <p>Les logos et marques cités appartiennent à leurs propriétaires respectifs.</p>
     <p style="margin-top:18px;color:var(--muted-2)">Dernière mise à jour : juin 2026.</p>
@@ -2672,40 +2621,6 @@ function heroWelcomeHTML(){
   </div>`;
 }
 
-/* ============================================================
-   BANDEAU LED "PARTENAIRES OFFICIELS" (parodie panneaux de stade)
-   👉 Pour ajouter un lien plus tard : remplis le champ "url".
-============================================================ */
-const SPONSORS=[
-  {nom:"Pickleball House", tagline:"THE FUTURE TEMPLE OF PICKLEBALL 🏓", logo:"logos/pickleball-house.png", url:"https://www.linkedin.com/company/pickleball-house/"},
-  {nom:"RC Dental",        tagline:"FOR THAT HOLLYWOOD SMILE ✨",        logo:"logos/rc-dental3.png",       url:"https://www.doctolib.fr/cabinet-dentaire/paris/cabinet-dentaire-rc-dental"},
-  {nom:"Numi",             tagline:"WHERE KIDS BECOME MATH MVPs 🧮",     logo:"logos/numi.jpeg",            url:"https://numimaths.fr"},
-  {nom:"JCE Avocats",      tagline:"HARVEY SPECTER IN PARIS ⚖️",         logo:"logos/jce2.png",             url:"https://jceavocats.fr/index.html"}
-];
-function sponsorPanel(s){
-  const inner=`<div class="spcard">
-      <img src="${escAttr(s.logo)}" alt="${escAttr(s.nom)}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
-      <span class="spname" style="display:none">${escAttr(s.nom)}</span>
-    </div>
-    <span class="sptag">${escAttr(s.tagline)}</span>`;
-  return s.url
-    ? `<a class="sponsor" href="${escAttr(s.url)}" target="_blank" rel="noopener">${inner}</a>`
-    : `<div class="sponsor">${inner}</div>`;
-}
-// Gag "rémunéré en Pringles" : affiché en étiquette fixe à droite sur desktop,
-// et glissé dans le défilement (panneau) sur mobile où l'étiquette fixe est masquée.
-function paidChip(){
-  return `<div class="sponsor paidchip"><span class="paidchiptext">Partenariats rémunérés<br>en boîtes de Pringles 🟢</span></div>`;
-}
-function sponsorBannerHTML(){
-  const one=SPONSORS.map(sponsorPanel).join("")+paidChip();
-  let seq=""; for(let i=0;i<6;i++)seq+=one;     // répété pour bien remplir
-  return `<div class="ledbanner" aria-label="Partenaires officiels">
-    <div class="ledlabel">★ Partenaires<br>officiels ★</div>
-    <div class="ledscroll"><div class="ledtrack">${seq}${seq}</div></div>
-  </div>`;
-}
-
 function renderPronos(){
   const hero=`${heroWelcomeHTML()}${resumayHTML()}`;
 
@@ -3152,8 +3067,6 @@ function paintStars(){
 }
 paintStars();
 
-// bandeau LED fixe en bas (contenu statique, rendu une seule fois)
-(function(){const lb=document.getElementById("ledbar");if(lb)lb.innerHTML=sponsorBannerHTML();})();
 // logo du site = la mascotte (dans la pastille du header)
 (function(){const c=document.getElementById("crest");if(c)c.innerHTML=EAGLE_SVG;})();
 // favicon (icône d'onglet) = la mascotte aussi
