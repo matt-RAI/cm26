@@ -31,7 +31,11 @@ export default {
     if (url.searchParams.get("secret") !== env.RESUMAY_CRON_SECRET) {
       return new Response("secret invalide", { status: 401 });
     }
-    const result = await runDailyEmail(env);
+    // Route : ?send=announce -> annonce PONCTUELLE (lancement des 16es de finale).
+    //          sinon          -> Morning Resumay du jour (comportement par défaut).
+    const result = url.searchParams.get("send") === "announce"
+      ? await runAnnounce(env)
+      : await runDailyEmail(env);
     return new Response(JSON.stringify(result, null, 2), {
       headers: { "content-type": "application/json; charset=utf-8" }
     });
@@ -181,6 +185,81 @@ async function runDailyEmail(env) {
   }
 
   return { day, destinataires: total, envoyes: ok, echecs: echecs.length, confirme: success, details_echecs: echecs };
+}
+
+// ============================================================
+// Envoi PONCTUEL d'une annonce (lancement des 16es de finale).
+// Réutilise la liste des membres + l'envoi throttlé Resend EXACTEMENT comme
+// le Morning Resumay (lots de 5, pause 1,1 s entre les lots, retry 429 dans
+// sendEmail) -> on ne dépasse jamais la limite Resend de 5 requêtes/seconde.
+// One-shot déclenché à la main : PAS de verrou quotidien (à déclencher une fois).
+// ============================================================
+async function runAnnounce(env) {
+  const SITE = env.SITE_URL || "https://cm26.workplay.fr";
+  const SB = env.SUPABASE_URL;
+  const SERVICE = env.SUPABASE_SERVICE_ROLE;
+  const RESEND = env.RESEND_API_KEY;
+  const FROM = env.MAIL_FROM || "CM26 <cm26@workplay.fr>";
+  if (!SB || !SERVICE) return { error: "SUPABASE_URL / SUPABASE_SERVICE_ROLE manquantes." };
+  if (!RESEND) return { error: "RESEND_API_KEY manquante." };
+
+  const members = await listMembers(SB, SERVICE);
+  if (!members.length) return { error: "Aucun membre avec e-mail trouvé." };
+
+  const subject = "⚔️ Les 16es de finale arrivent — à tes pronos !";
+  const BATCH = 5, PAUSE_MS = 1100; // 5 envois/s max (limite Resend), comme le Resumay
+  let ok = 0;
+  const echecs = [];
+  for (let i = 0; i < members.length; i += BATCH) {
+    const lot = members.slice(i, i + BATCH);
+    const res = await Promise.allSettled(lot.map(m =>
+      sendEmail(RESEND, FROM, m.email, subject, announceHTML(m.pseudo, SITE))
+    ));
+    res.forEach((s, j) => {
+      const email = lot[j].email;
+      if (s.status === "fulfilled" && s.value.ok) { ok++; return; }
+      const raison = s.status === "rejected" ? String(s.reason) : s.value.detail;
+      echecs.push({ email, raison });
+      console.log("Échec envoi annonce", email, raison);
+    });
+    if (i + BATCH < members.length) await delay(PAUSE_MS); // pas de pause après le dernier lot
+  }
+
+  // Alerte admin si au moins un échec (même réflexe que l'e-mail du matin).
+  if (echecs.length > 0) {
+    await sendAlert(RESEND, FROM, "annonce-16es", members.length, ok, echecs);
+  }
+  return { type: "announce", destinataires: members.length, envoyes: ok, echecs: echecs.length, details_echecs: echecs };
+}
+
+// Gabarit HTML de l'annonce des 16es de finale (mêmes styles inline que le Resumay).
+function announceHTML(pseudo, site) {
+  const hi = pseudo ? "Salut " + esc(pseudo) + " 👋" : "Salut 👋";
+  const para = [
+    "La phase de groupes, c'est plié. 🏁 Les valises sont faites pour certains, les choses sérieuses commencent pour les autres : <b>les 16es de finale arrivent !</b>",
+    "À partir d'ici, plus de filet : un match nul et hop — prolongations, puis tirs au but, et toi les nerfs en compote. 😬",
+    "👉 File poser tes pronos <b>avant le coup d'envoi</b>. Une fois le match lancé, c'est verrouillé — et les regrets, ça ne rapporte aucun point.",
+    "Que le meilleur gagne. Et entre nous, le meilleur, c'est sûrement toi. (Ou pas. On verra au classement. 🦅)"
+  ].join("<br><br>");
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+    '<body style="margin:0;background:#071124;font-family:Arial,Helvetica,sans-serif;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#071124;padding:24px 12px;"><tr><td align="center">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#f5f2e8;border-radius:16px;overflow:hidden;border:2px solid #0a1733;">' +
+    '<tr><td style="background:#0a1733;padding:18px 24px;">' +
+    '<span style="color:#ffce3a;font-size:22px;font-weight:bold;">⚔️ Phase finale</span>' +
+    '<span style="color:#f5f2e8;font-size:13px;"> — CM26</span></td></tr>' +
+    '<tr><td style="padding:22px 24px 6px;color:#0a1733;font-size:16px;font-weight:bold;">' + hi + '</td></tr>' +
+    '<tr><td style="padding:4px 24px 18px;color:#26344f;font-size:15px;line-height:1.55;">' + para + '</td></tr>' +
+    '<tr><td style="padding:0 24px 24px;" align="center">' +
+    '<a href="' + esc(site) + '" style="display:inline-block;background:#ef2b3d;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:12px 22px;border-radius:11px;">Faire mes pronos &rarr;</a>' +
+    '</td></tr>' +
+    '<tr><td style="background:#efe9d8;padding:16px 24px;color:#6f6657;font-size:12px;line-height:1.5;">' +
+    'Tu reçois cet e-mail parce que tu es membre de CM26 (le concours de pronos entre amis 🦅).<br>' +
+    'Pour ne plus recevoir nos e-mails, réponds simplement <b>STOP</b> à cet e-mail.' +
+    '</td></tr></table>' +
+    '<div style="color:#6f87b6;font-size:11px;margin-top:14px;">CM26 · cm26.workplay.fr</div>' +
+    '</td></tr></table></body></html>';
 }
 
 // Alerte admin (Resend) en cas d'échec d'envoi. Si Resend est lui-même injoignable,
