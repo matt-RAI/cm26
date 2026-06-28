@@ -1603,7 +1603,7 @@ function renderWatchlist(){
     html+=emptyState("★","Ta watchlist est vide","Ajoute des matchs depuis l'onglet « Matchs & Pronos » en cliquant sur l'étoile ☆.");
   }else{
     list.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-    list.forEach((m,i)=>{html+=`<div class="panel" style="margin-bottom:12px;animation:rise .4s both;animation-delay:${i*.04}s">${m.stage==="GROUP_STAGE"?matchPronoRow(m):finalRow(m)}</div>`});
+    list.forEach((m,i)=>{html+=`<div class="panel" style="margin-bottom:12px;animation:rise .4s both;animation-delay:${i*.04}s">${matchPronoRow(m)}</div>`});
   }
   view.innerHTML=html;
 }
@@ -2349,6 +2349,8 @@ function matchActions(m){
 //  - EN COURS (IN_PLAY/PAUSED, ou fini sans résultat encore) : ton prono en lecture seule + "résultat à venir".
 //  - À VENIR (TIMED/SCHEDULED) : champs de saisie du prono (verrouillés 1 h avant le coup d'envoi). Inchangé.
 function matchPronoRow(m){
+  // Équipes pas encore connues (phase finale à venir) -> placeholder, pas de saisie.
+  if(!(m.homeTeam&&m.homeTeam.name&&m.awayTeam&&m.awayTeam.name))return unknownMatchRow(m);
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const id=String(m.id);
   const p=state.pronos[id]||{};
@@ -2398,8 +2400,9 @@ function matchPronoRow(m){
       <span class="pacts">${matchActions(m)}</span></div>
   </div>`;
 }
-// Ligne d'un match de phase finale (équipes possiblement inconnues, pas de prono pour l'instant).
-function finalRow(m){
+// Ligne d'un match dont les équipes ne sont PAS encore connues (phase finale à venir) :
+// pas de prono possible, on affiche juste le libellé de la phase (ou le score s'il existe).
+function unknownMatchRow(m){
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const sc=(m.score&&m.score.fullTime)||{};
   const hasScore=sc.home!=null && sc.away!=null;
@@ -2509,10 +2512,24 @@ function matchListHTML(rowFn, finalsNote){
   });
   if(finals.length){
     finals.sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-    const up=finals.filter(m=>!isOld(m)), old=finals.filter(isOld);
-    if(up.length){ upHTML+=`<h4 class="mdh">Phase finale</h4>
-      <p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`+up.map(finalRow).join(""); upcomingCount+=up.length; }
-    if(old.length){ pastHTML+=`<h4 class="mdh">Phase finale</h4>`+old.map(finalRow).join(""); pastCount+=old.length; }
+    // Un bloc par tour, dans l'ordre du tournoi (16es -> finale).
+    const STAGE_ORDER=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","THIRD_PLACE","FINAL"];
+    const byStage={};
+    finals.forEach(m=>{(byStage[m.stage]=byStage[m.stage]||[]).push(m)}); // déjà trié par date
+    Object.keys(byStage)
+      .sort((a,b)=>{const ia=STAGE_ORDER.indexOf(a),ib=STAGE_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)})
+      .forEach(st=>{
+        const ms=byStage[st];
+        const head=`<h4 class="mdh">${stageLabel(st)}</h4>`;
+        const up=ms.filter(m=>!isOld(m)), old=ms.filter(isOld);
+        if(up.length){
+          // Note "équipes à déterminer" seulement s'il reste des affiches inconnues dans ce tour.
+          const someUnknown=up.some(m=>!(m.homeTeam&&m.homeTeam.name&&m.awayTeam&&m.awayTeam.name));
+          upHTML+=head+(someUnknown?`<p class="sub" style="margin:-2px 0 8px">${finalsNote}</p>`:"")+up.map(rowFn).join("");
+          upcomingCount+=up.length;
+        }
+        if(old.length){ pastHTML+=head+old.map(rowFn).join(""); pastCount+=old.length; }
+      });
   }
   // Bloc dépliable des résultats passés : fermé par défaut (ouvert d'office s'il n'y a aucun
   // match à venir à afficher). Placé EN HAUT pour qu'on le trouve et le déroule facilement.
@@ -2530,6 +2547,7 @@ function resultMatchesHTML(){ return matchListHTML(matchResultRow, "Équipes à 
 
 // Ligne RÉSULTAT (lecture seule) : score si joué, sinon "–". Pas de champ de prono.
 function matchResultRow(m){
+  if(!(m.homeTeam&&m.homeTeam.name&&m.awayTeam&&m.awayTeam.name))return unknownMatchRow(m);
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const id=String(m.id);
   const sc=(m.score&&m.score.fullTime)||{};
