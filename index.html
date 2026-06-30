@@ -421,6 +421,8 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .brk-cell.lc-on::after{content:"";position:absolute;right:0;top:50%;width:24px;height:0;border-top:2px solid var(--line-2)}
 .brk-cell.vj-on::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid var(--line-2)}
 .brk-legend{margin:0 0 10px;font-size:11px;color:var(--muted-2)}
+.bm-ph .bm-nm.muted{color:var(--muted-2);font-style:italic;font-size:12px}
+.bm-ph .bm-row{padding:3px 0}
 .bm{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;position:relative;z-index:1}
 .bm.live{border-color:var(--red)}
 .bm-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper);padding:2px 0}
@@ -2956,6 +2958,30 @@ function brkCard(m){
     <div class="bm-meta">${meta}</div>
   </div>`;
 }
+// Libellé d'un feeder pour une carte « à venir » : équipe qualifiée si connue,
+// sinon l'affiche du tour précédent (« Vainq. Allemagne–Paraguay »), sinon « À déterminer ».
+function brkFeederLabel(node){
+  if(!node)return "À déterminer";
+  if(node.winner!=null && node.match){
+    const w=(node.match.homeTeam&&node.match.homeTeam.id===node.winner)?node.match.homeTeam:node.match.awayTeam;
+    return apiTeamDisplay(w).name;
+  }
+  const m=node.match;
+  if(m && m.homeTeam && m.homeTeam.name && m.awayTeam && m.awayTeam.name){
+    return "Vainq. "+apiTeamDisplay(m.homeTeam).name+"–"+apiTeamDisplay(m.awayTeam).name;
+  }
+  return "À déterminer";
+}
+// Carte d'un nœud de l'arbre : le vrai match si ses équipes sont connues, sinon
+// un placeholder structurel qui montre d'où viendront les deux équipes.
+function brkNodeCard(node){
+  const m=node.match;
+  if(m && m.homeTeam && (m.homeTeam.name||m.awayTeam.name)) return brkCard(m);
+  return `<div class="bm bm-ph">
+    <div class="bm-row"><span class="bm-nm muted">${brkFeederLabel(node.c1)}</span></div>
+    <div class="bm-row"><span class="bm-nm muted">${brkFeederLabel(node.c2)}</span></div>
+  </div>`;
+}
 function bracketHTML(){
   ensureApiMatches(); // charge les matchs si besoin (re-render auto au retour)
   if(!apiMatches){
@@ -2970,53 +2996,66 @@ function bracketHTML(){
   const byStage={};
   finals.forEach(m=>{(byStage[m.stage]=byStage[m.stage]||[]).push(m)});
   const sortById=a=>(a||[]).slice().sort((x,y)=>Number(x.id)-Number(y.id));
-  // 8es -> finale : slots pré-alloués -> ordre par id = ordre du tableau (stable).
-  const R16=sortById(byStage.LAST_16), QF=sortById(byStage.QUARTER_FINALS),
-        SF=sortById(byStage.SEMI_FINALS), F=sortById(byStage.FINAL);
-  // 16es : paires d'ids consécutifs (confirmé par les résultats). On place chaque paire
-  // sous SON 8e (déduit du vainqueur déjà placé) ; les paires encore inconnues prennent
-  // les slots restants. Aucune branche n'est AFFIRMÉE tant qu'un résultat ne la confirme pas.
-  const r32=sortById(byStage.LAST_32);
-  let R32=r32;
-  if(r32.length===16 && R16.length===8){
-    const pairs=[]; for(let i=0;i<16;i+=2)pairs.push([r32[i],r32[i+1]]);
-    const slotOf=t=>{const w=brkWinnerId(t); if(w==null)return -1; return R16.findIndex(r=>brkChildHas(r,w));};
-    const placed=new Array(8).fill(null), rest=[];
-    pairs.forEach(p=>{let s=slotOf(p[0]); if(s<0)s=slotOf(p[1]); if(s>=0 && !placed[s])placed[s]=p; else rest.push(p);});
-    let ri=0; for(let s=0;s<8;s++)if(!placed[s])placed[s]=rest[ri++]||[];
-    R32=placed.flat();
+
+  // ORDRE OFFICIEL DU TABLEAU : les 16es triés par id = ordre du bracket (vérifié sur le
+  // calendrier officiel). Les paires CONSÉCUTIVES alimentent les 8es (confirmé par les
+  // résultats : Afrique du Sud + Pays-Bas -> Canada/Maroc). On reconstruit donc tout l'arbre
+  // structurellement, puis on rattache chaque nœud à son vrai match dès que l'équipe est connue.
+  const L32=sortById(byStage.LAST_32);
+  // Repli si données inattendues (≠16 seizièmes) : simple liste par tour, sans croisements.
+  if(L32.length!==16){
+    const cols=BRACKET_TREE_FALLBACK.filter(st=>byStage[st]).map(st=>
+      `<div class="brk-col"><div class="brk-h">${stageLabel(st)}</div><div class="brk-cells">${sortById(byStage[st]).map(m=>`<div class="brk-cell">${brkCard(m)}</div>`).join("")}</div></div>`).join("");
+    return `<div class="brk-scroll"><div class="brk">${cols}</div></div>`;
   }
-  // Colonnes de l'arbre. on=lien confirmé par un résultat (trait plein), sinon pointillé.
-  const stages=[
-    {key:"LAST_32",ms:R32,child:R16},
-    {key:"LAST_16",ms:R16,child:QF},
-    {key:"QUARTER_FINALS",ms:QF,child:SF},
-    {key:"SEMI_FINALS",ms:SF,child:F},
-    {key:"FINAL",ms:F,child:[]}
-  ].filter(s=>s.ms && s.ms.length);
-  const cols=stages.map((st,ci)=>{
-    const last=ci===stages.length-1;
-    const cells=st.ms.map((m,i)=>{
-      const child=last?null:st.child[Math.floor(i/2)];
-      const on=!last && brkChildHas(child,brkWinnerId(m)); // ce match envoie son vainqueur dans l'enfant ?
+  // Nœuds-feuilles = 16es dans l'ordre du tableau.
+  const leaves=L32.map(m=>({match:m,c1:null,c2:null,winner:brkWinnerId(m)}));
+  // Un tour = on apparie les nœuds 2 à 2 ; chaque nœud parent reçoit le vrai match de l'API
+  // dont les équipes contiennent le vainqueur d'un de ses deux feeders (sinon placeholder).
+  function nextRound(children,stage){
+    const pool=sortById(byStage[stage]||[]); const used=new Set(); const nodes=[];
+    for(let i=0;i<children.length;i+=2){
+      const c1=children[i], c2=children[i+1]||null;
+      const w1=c1&&c1.winner, w2=c2&&c2.winner;
+      let match=null;
+      if(w1!=null||w2!=null) match=pool.find(m=>!used.has(m.id) && ((w1!=null&&brkChildHas(m,w1))||(w2!=null&&brkChildHas(m,w2))))||null;
+      if(match)used.add(match.id);
+      nodes.push({match,c1,c2,winner:match?brkWinnerId(match):null});
+    }
+    return nodes;
+  }
+  const r16=nextRound(leaves,"LAST_16"), qf=nextRound(r16,"QUARTER_FINALS"),
+        sf=nextRound(qf,"SEMI_FINALS"), fn=nextRound(sf,"FINAL");
+  const levels=[
+    {key:"LAST_32",nodes:leaves},{key:"LAST_16",nodes:r16},
+    {key:"QUARTER_FINALS",nodes:qf},{key:"SEMI_FINALS",nodes:sf},{key:"FINAL",nodes:fn}
+  ];
+  const cols=levels.map((lv,li)=>{
+    const last=li===levels.length-1;
+    const parents=last?null:levels[li+1].nodes;
+    const cells=lv.nodes.map((node,i)=>{
+      const parent=last?null:parents[Math.floor(i/2)];
+      const on=!last && parent && parent.match && brkChildHas(parent.match,node.winner); // lien confirmé par un résultat
       const cls=["brk-cell"];
-      if(on)cls.push("lc-on"); // trait horizontal seulement si confirmé
-      if(!last && i%2===0){ // la cellule du haut porte le trait vertical de la paire
-        const sib=st.ms[i+1], onSib=brkChildHas(child,brkWinnerId(sib));
-        if(on && onSib)cls.push("vj-on"); // jointure verticale seulement si les DEUX feeders sont confirmés
+      if(on)cls.push("lc-on");
+      if(!last && i%2===0){
+        const sib=lv.nodes[i+1];
+        const onSib=parent && parent.match && sib && brkChildHas(parent.match,sib.winner);
+        if(on && onSib)cls.push("vj-on");
       }
-      return `<div class="${cls.join(' ')}">${brkCard(m)}</div>`;
+      return `<div class="${cls.join(' ')}">${brkNodeCard(node)}</div>`;
     }).join("");
-    return `<div class="brk-col"><div class="brk-h">${stageLabel(st.key)}</div><div class="brk-cells">${cells}</div></div>`;
+    return `<div class="brk-col"><div class="brk-h">${stageLabel(lv.key)}</div><div class="brk-cells">${cells}</div></div>`;
   }).join("");
   // 3e place (petite finale) : hors arbre, affichée dessous.
   let third="";
   if(byStage.THIRD_PLACE && byStage.THIRD_PLACE[0]){
     third=`<div class="brk-third"><div class="brk-h">${stageLabel("THIRD_PLACE")}</div>${brkCard(byStage.THIRD_PLACE[0])}</div>`;
   }
-  const legend=`<div class="brk-legend">Les branches s'affichent au fur et à mesure des résultats (le vainqueur d'un match rejoint le tour suivant).</div>`;
+  const legend=`<div class="brk-legend">Ordre officiel du tableau · les affiches à venir indiquent d'où viennent les qualifiés ; les scores arrivent au fil des résultats.</div>`;
   return legend+`<div class="brk-scroll"><div class="brk">${cols}</div></div>`+third;
 }
+const BRACKET_TREE_FALLBACK=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL"];
 
 /* ---------- INFOS (feed) ---------- */
 /* ---------- UTILS ---------- */
