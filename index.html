@@ -416,15 +416,11 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .brk-h{font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);text-align:center;padding:6px 4px 10px}
 .brk-cells{flex:1;display:flex;flex-direction:column}
 .brk-cell{flex:1;display:flex;align-items:center;position:relative;padding:6px 24px 6px 0}
-/* trait horizontal sortant de chaque match (sauf dernière colonne = finale).
-   Plein = affrontement confirmé par un résultat ; pointillé = structure provisoire. */
-.brk-col:not(:last-child) .brk-cell::after{content:"";position:absolute;right:0;top:50%;width:24px;height:0;border-top:2px solid var(--line-2)}
-.brk-cell.lc-off::after{border-top-style:dashed;opacity:.45}
-/* trait vertical qui relie les deux matchs d'une paire (porté par le match du haut) */
-.brk-col:not(:last-child) .brk-cell.vj::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid var(--line-2)}
-.brk-cell.vj.vj-off::before{border-left-style:dashed;opacity:.45}
-.brk-legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px;font-size:11px;color:var(--muted-2)}
-.brk-legend .lg-on{color:var(--muted)}
+/* Connecteurs : on ne dessine QUE les affrontements confirmés par un résultat
+   (le vainqueur est déjà placé dans le match suivant). Aucune branche devinée. */
+.brk-cell.lc-on::after{content:"";position:absolute;right:0;top:50%;width:24px;height:0;border-top:2px solid var(--line-2)}
+.brk-cell.vj-on::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid var(--line-2)}
+.brk-legend{margin:0 0 10px;font-size:11px;color:var(--muted-2)}
 .bm{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;position:relative;z-index:1}
 .bm.live{border-color:var(--red)}
 .bm-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper);padding:2px 0}
@@ -3002,12 +2998,12 @@ function bracketHTML(){
     const last=ci===stages.length-1;
     const cells=st.ms.map((m,i)=>{
       const child=last?null:st.child[Math.floor(i/2)];
-      const on=!last && brkChildHas(child,brkWinnerId(m));
+      const on=!last && brkChildHas(child,brkWinnerId(m)); // ce match envoie son vainqueur dans l'enfant ?
       const cls=["brk-cell"];
-      if(!last)cls.push(on?"lc-on":"lc-off");
+      if(on)cls.push("lc-on"); // trait horizontal seulement si confirmé
       if(!last && i%2===0){ // la cellule du haut porte le trait vertical de la paire
         const sib=st.ms[i+1], onSib=brkChildHas(child,brkWinnerId(sib));
-        cls.push("vj",(on||onSib)?"vj-on":"vj-off");
+        if(on && onSib)cls.push("vj-on"); // jointure verticale seulement si les DEUX feeders sont confirmés
       }
       return `<div class="${cls.join(' ')}">${brkCard(m)}</div>`;
     }).join("");
@@ -3018,7 +3014,7 @@ function bracketHTML(){
   if(byStage.THIRD_PLACE && byStage.THIRD_PLACE[0]){
     third=`<div class="brk-third"><div class="brk-h">${stageLabel("THIRD_PLACE")}</div>${brkCard(byStage.THIRD_PLACE[0])}</div>`;
   }
-  const legend=`<div class="brk-legend"><span class="lg lg-on">━━ affrontement confirmé</span><span class="lg lg-off">┄┄ à confirmer (structure)</span></div>`;
+  const legend=`<div class="brk-legend">Les branches s'affichent au fur et à mesure des résultats (le vainqueur d'un match rejoint le tour suivant).</div>`;
   return legend+`<div class="brk-scroll"><div class="brk">${cols}</div></div>`+third;
 }
 
