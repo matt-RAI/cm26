@@ -409,13 +409,30 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .prono .pmeta{grid-column:1/-1;font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
 .prono .pmeta .pacts{display:flex;gap:6px;margin-left:6px}
 .iconbtn.sm{width:30px;height:30px;border-radius:9px;font-size:14px}
-/* --- Tableau final (bracket) : colonnes par tour, défilement horizontal --- */
-.bracket{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 16px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
-.bcol{flex:0 0 300px;max-width:300px;scroll-snap-align:start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
-.bcol .bhd{margin:0 0 4px;font-size:15px;color:var(--paper);display:flex;align-items:center;gap:8px}
-.bcol .bcount{font-size:11px;font-weight:700;color:var(--ink);background:var(--gold);border-radius:999px;padding:1px 8px}
-.bcol .bbody .prono{padding:11px 0}
-@media(max-width:560px){.bcol{flex:0 0 86vw;max-width:86vw}}
+/* --- Tableau final (bracket) : vrai arbre, tours reliés par des connecteurs --- */
+.brk-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 16px}
+.brk{display:flex;align-items:stretch;min-width:max-content}
+.brk-col{display:flex;flex-direction:column;width:208px;min-width:208px}
+.brk-h{font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);text-align:center;padding:6px 4px 10px}
+.brk-cells{flex:1;display:flex;flex-direction:column}
+.brk-cell{flex:1;display:flex;align-items:center;position:relative;padding:6px 24px 6px 0}
+/* trait horizontal sortant de chaque match (sauf dernière colonne = finale) */
+.brk-col:not(:last-child) .brk-cell::after{content:"";position:absolute;right:0;top:50%;width:24px;height:2px;background:var(--line-2)}
+/* trait vertical qui relie les deux matchs d'une paire (porté par le match du haut) */
+.brk-col:not(:last-child) .brk-cell:nth-child(odd)::before{content:"";position:absolute;right:0;top:50%;height:100%;width:2px;background:var(--line-2)}
+.bm{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;position:relative;z-index:1}
+.bm.live{border-color:var(--red)}
+.bm-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper);padding:2px 0}
+.bm-row .flag{flex:none}
+.bm-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm-row.win .bm-nm{font-weight:800}
+.bm-row.out .bm-nm{color:var(--muted-2)}
+.bm-sc{font-family:'DM Mono';font-weight:700;font-size:14px;color:var(--muted)}
+.bm-row.win .bm-sc{color:var(--gold)}
+.bm-meta{margin-top:5px;font-size:10px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm-meta .m6{color:#ffce3a}.bm-meta .bein{color:#7aa7ff}
+.brk-third{margin-top:12px;max-width:240px}
+.brk-third .brk-h{text-align:left;padding-left:2px}
 .pbadge{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
 .pbadge.fin{color:var(--muted-2)}
 .pbadge.live{color:var(--red);border-color:var(--red)}
@@ -2896,7 +2913,30 @@ function renderGroups(){
 // Vue rapide en LECTURE SEULE de la phase à élimination directe : une colonne par
 // tour (16es -> finale), affiches + horaires (Paris) + chaînes TV + score si joué.
 // Réutilise matchResultRow (gère équipes inconnues, score, statut, ★/agenda).
-const BRACKET_STAGES=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","THIRD_PLACE","FINAL"];
+// Les tours de l'ARBRE, dans l'ordre (16es -> finale). La 3e place est affichée à part.
+const BRACKET_TREE=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL"];
+// Heure de Paris compacte (sans jour de semaine) pour les cartes du bracket.
+function brkWhen(utc){
+  try{return new Date(utc).toLocaleString("fr-FR",{timeZone:"Europe/Paris",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+  catch(e){return""}
+}
+// Carte compacte d'un match dans l'arbre : 2 lignes (équipes + score), puis heure + chaînes.
+function brkCard(m){
+  const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
+  const sc=(m.score&&m.score.fullTime)||{};
+  const has=sc.home!=null && sc.away!=null;
+  const fin=m.status==="FINISHED" && has;
+  const live=m.status==="IN_PLAY"||m.status==="PAUSED";
+  const hWin=fin && sc.home>sc.away, aWin=fin && sc.away>sc.home;
+  const tvs=channelsFor(m).map(c=>c==="m6"?'<b class="m6">M6</b>':'<b class="bein">beIN</b>').join(" ");
+  const meta=`${live?'🔴 ':''}${brkWhen(m.utcDate)}${tvs?` · ${tvs}`:''}`;
+  const row=(t,scv,win,lose)=>`<div class="bm-row ${win?'win':''} ${lose?'out':''}">${t.flag}<span class="bm-nm">${t.name}</span>${has?`<span class="bm-sc">${scv}</span>`:''}</div>`;
+  return `<div class="bm ${live?'live':''}" id="brk-${m.id}">
+    ${row(home,sc.home,hWin,fin&&!hWin)}
+    ${row(away,sc.away,aWin,fin&&!aWin)}
+    <div class="bm-meta">${meta}</div>
+  </div>`;
+}
 function bracketHTML(){
   ensureApiMatches(); // charge les matchs si besoin (re-render auto au retour)
   if(!apiMatches){
@@ -2910,17 +2950,18 @@ function bracketHTML(){
   }
   const byStage={};
   finals.forEach(m=>{(byStage[m.stage]=byStage[m.stage]||[]).push(m)});
-  // Ordre du tournoi d'abord, puis tout tour inattendu en dernier (garde-fou).
-  const order=BRACKET_STAGES.filter(st=>byStage[st])
-    .concat(Object.keys(byStage).filter(st=>!BRACKET_STAGES.includes(st)));
-  const cols=order.map(st=>{
-    const ms=byStage[st].sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate));
-    return `<div class="bcol">
-      <h4 class="bhd">${stageLabel(st)} <span class="bcount">${ms.length}</span></h4>
-      <div class="bbody">${ms.map(matchResultRow).join("")}</div>
-    </div>`;
+  const sortMs=ms=>ms.slice().sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate)||String(a.id).localeCompare(String(b.id)));
+  // Une colonne par tour présent ; les cellules flex:1 alignent les paires -> connecteurs CSS.
+  const cols=BRACKET_TREE.filter(st=>byStage[st]).map(st=>{
+    const cells=sortMs(byStage[st]).map(m=>`<div class="brk-cell">${brkCard(m)}</div>`).join("");
+    return `<div class="brk-col"><div class="brk-h">${stageLabel(st)}</div><div class="brk-cells">${cells}</div></div>`;
   }).join("");
-  return `<div class="bracket">${cols}</div>`;
+  // 3e place (petite finale) : hors arbre, affichée dessous.
+  let third="";
+  if(byStage.THIRD_PLACE && byStage.THIRD_PLACE[0]){
+    third=`<div class="brk-third"><div class="brk-h">${stageLabel("THIRD_PLACE")}</div>${brkCard(byStage.THIRD_PLACE[0])}</div>`;
+  }
+  return `<div class="brk-scroll"><div class="brk">${cols}</div></div>${third}`;
 }
 
 /* ---------- INFOS (feed) ---------- */
