@@ -416,10 +416,15 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .brk-h{font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);text-align:center;padding:6px 4px 10px}
 .brk-cells{flex:1;display:flex;flex-direction:column}
 .brk-cell{flex:1;display:flex;align-items:center;position:relative;padding:6px 24px 6px 0}
-/* trait horizontal sortant de chaque match (sauf dernière colonne = finale) */
-.brk-col:not(:last-child) .brk-cell::after{content:"";position:absolute;right:0;top:50%;width:24px;height:2px;background:var(--line-2)}
+/* trait horizontal sortant de chaque match (sauf dernière colonne = finale).
+   Plein = affrontement confirmé par un résultat ; pointillé = structure provisoire. */
+.brk-col:not(:last-child) .brk-cell::after{content:"";position:absolute;right:0;top:50%;width:24px;height:0;border-top:2px solid var(--line-2)}
+.brk-cell.lc-off::after{border-top-style:dashed;opacity:.45}
 /* trait vertical qui relie les deux matchs d'une paire (porté par le match du haut) */
-.brk-col:not(:last-child) .brk-cell:nth-child(odd)::before{content:"";position:absolute;right:0;top:50%;height:100%;width:2px;background:var(--line-2)}
+.brk-col:not(:last-child) .brk-cell.vj::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid var(--line-2)}
+.brk-cell.vj.vj-off::before{border-left-style:dashed;opacity:.45}
+.brk-legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px;font-size:11px;color:var(--muted-2)}
+.brk-legend .lg-on{color:var(--muted)}
 .bm{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;position:relative;z-index:1}
 .bm.live{border-color:var(--red)}
 .bm-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper);padding:2px 0}
@@ -2913,27 +2918,45 @@ function renderGroups(){
 // Vue rapide en LECTURE SEULE de la phase à élimination directe : une colonne par
 // tour (16es -> finale), affiches + horaires (Paris) + chaînes TV + score si joué.
 // Réutilise matchResultRow (gère équipes inconnues, score, statut, ★/agenda).
-// Les tours de l'ARBRE, dans l'ordre (16es -> finale). La 3e place est affichée à part.
-const BRACKET_TREE=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL"];
 // Heure de Paris compacte (sans jour de semaine) pour les cartes du bracket.
 function brkWhen(utc){
   try{return new Date(utc).toLocaleString("fr-FR",{timeZone:"Europe/Paris",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
   catch(e){return""}
+}
+// id de l'équipe gagnante d'un match terminé (gère les tirs au but via score.winner), sinon null.
+function brkWinnerId(m){
+  if(!m || m.status!=="FINISHED")return null;
+  const w=m.score&&m.score.winner;
+  if(w==="HOME_TEAM")return m.homeTeam&&m.homeTeam.id;
+  if(w==="AWAY_TEAM")return m.awayTeam&&m.awayTeam.id;
+  // repli si winner absent : compare le score (puis les tirs au but).
+  const ft=(m.score&&m.score.fullTime)||{}, pn=(m.score&&m.score.penalties)||{};
+  if(ft.home!=null && ft.away!=null){
+    if(ft.home>ft.away)return m.homeTeam&&m.homeTeam.id;
+    if(ft.away>ft.home)return m.awayTeam&&m.awayTeam.id;
+    if(pn.home!=null && pn.away!=null)return (pn.home>pn.away ? m.homeTeam : m.awayTeam||{}).id;
+  }
+  return null;
+}
+// Vrai si l'équipe `id` (vainqueur) figure dans le match enfant -> affrontement CONFIRMÉ.
+function brkChildHas(child,id){
+  return !!(child && id!=null && ((child.homeTeam&&child.homeTeam.id===id)||(child.awayTeam&&child.awayTeam.id===id)));
 }
 // Carte compacte d'un match dans l'arbre : 2 lignes (équipes + score), puis heure + chaînes.
 function brkCard(m){
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const sc=(m.score&&m.score.fullTime)||{};
   const has=sc.home!=null && sc.away!=null;
-  const fin=m.status==="FINISHED" && has;
   const live=m.status==="IN_PLAY"||m.status==="PAUSED";
-  const hWin=fin && sc.home>sc.away, aWin=fin && sc.away>sc.home;
+  const win=brkWinnerId(m);
+  const hWin=win!=null && m.homeTeam && m.homeTeam.id===win;
+  const aWin=win!=null && m.awayTeam && m.awayTeam.id===win;
   const tvs=channelsFor(m).map(c=>c==="m6"?'<b class="m6">M6</b>':'<b class="bein">beIN</b>').join(" ");
   const meta=`${live?'🔴 ':''}${brkWhen(m.utcDate)}${tvs?` · ${tvs}`:''}`;
-  const row=(t,scv,win,lose)=>`<div class="bm-row ${win?'win':''} ${lose?'out':''}">${t.flag}<span class="bm-nm">${t.name}</span>${has?`<span class="bm-sc">${scv}</span>`:''}</div>`;
+  const row=(t,scv,w,l)=>`<div class="bm-row ${w?'win':''} ${l?'out':''}">${t.flag}<span class="bm-nm">${t.name}</span>${has?`<span class="bm-sc">${scv}</span>`:''}</div>`;
   return `<div class="bm ${live?'live':''}" id="brk-${m.id}">
-    ${row(home,sc.home,hWin,fin&&!hWin)}
-    ${row(away,sc.away,aWin,fin&&!aWin)}
+    ${row(home,sc.home,hWin,win!=null&&!hWin)}
+    ${row(away,sc.away,aWin,win!=null&&!aWin)}
     <div class="bm-meta">${meta}</div>
   </div>`;
 }
@@ -2950,18 +2973,53 @@ function bracketHTML(){
   }
   const byStage={};
   finals.forEach(m=>{(byStage[m.stage]=byStage[m.stage]||[]).push(m)});
-  const sortMs=ms=>ms.slice().sort((a,b)=>new Date(a.utcDate)-new Date(b.utcDate)||String(a.id).localeCompare(String(b.id)));
-  // Une colonne par tour présent ; les cellules flex:1 alignent les paires -> connecteurs CSS.
-  const cols=BRACKET_TREE.filter(st=>byStage[st]).map(st=>{
-    const cells=sortMs(byStage[st]).map(m=>`<div class="brk-cell">${brkCard(m)}</div>`).join("");
-    return `<div class="brk-col"><div class="brk-h">${stageLabel(st)}</div><div class="brk-cells">${cells}</div></div>`;
+  const sortById=a=>(a||[]).slice().sort((x,y)=>Number(x.id)-Number(y.id));
+  // 8es -> finale : slots pré-alloués -> ordre par id = ordre du tableau (stable).
+  const R16=sortById(byStage.LAST_16), QF=sortById(byStage.QUARTER_FINALS),
+        SF=sortById(byStage.SEMI_FINALS), F=sortById(byStage.FINAL);
+  // 16es : paires d'ids consécutifs (confirmé par les résultats). On place chaque paire
+  // sous SON 8e (déduit du vainqueur déjà placé) ; les paires encore inconnues prennent
+  // les slots restants. Aucune branche n'est AFFIRMÉE tant qu'un résultat ne la confirme pas.
+  const r32=sortById(byStage.LAST_32);
+  let R32=r32;
+  if(r32.length===16 && R16.length===8){
+    const pairs=[]; for(let i=0;i<16;i+=2)pairs.push([r32[i],r32[i+1]]);
+    const slotOf=t=>{const w=brkWinnerId(t); if(w==null)return -1; return R16.findIndex(r=>brkChildHas(r,w));};
+    const placed=new Array(8).fill(null), rest=[];
+    pairs.forEach(p=>{let s=slotOf(p[0]); if(s<0)s=slotOf(p[1]); if(s>=0 && !placed[s])placed[s]=p; else rest.push(p);});
+    let ri=0; for(let s=0;s<8;s++)if(!placed[s])placed[s]=rest[ri++]||[];
+    R32=placed.flat();
+  }
+  // Colonnes de l'arbre. on=lien confirmé par un résultat (trait plein), sinon pointillé.
+  const stages=[
+    {key:"LAST_32",ms:R32,child:R16},
+    {key:"LAST_16",ms:R16,child:QF},
+    {key:"QUARTER_FINALS",ms:QF,child:SF},
+    {key:"SEMI_FINALS",ms:SF,child:F},
+    {key:"FINAL",ms:F,child:[]}
+  ].filter(s=>s.ms && s.ms.length);
+  const cols=stages.map((st,ci)=>{
+    const last=ci===stages.length-1;
+    const cells=st.ms.map((m,i)=>{
+      const child=last?null:st.child[Math.floor(i/2)];
+      const on=!last && brkChildHas(child,brkWinnerId(m));
+      const cls=["brk-cell"];
+      if(!last)cls.push(on?"lc-on":"lc-off");
+      if(!last && i%2===0){ // la cellule du haut porte le trait vertical de la paire
+        const sib=st.ms[i+1], onSib=brkChildHas(child,brkWinnerId(sib));
+        cls.push("vj",(on||onSib)?"vj-on":"vj-off");
+      }
+      return `<div class="${cls.join(' ')}">${brkCard(m)}</div>`;
+    }).join("");
+    return `<div class="brk-col"><div class="brk-h">${stageLabel(st.key)}</div><div class="brk-cells">${cells}</div></div>`;
   }).join("");
   // 3e place (petite finale) : hors arbre, affichée dessous.
   let third="";
   if(byStage.THIRD_PLACE && byStage.THIRD_PLACE[0]){
     third=`<div class="brk-third"><div class="brk-h">${stageLabel("THIRD_PLACE")}</div>${brkCard(byStage.THIRD_PLACE[0])}</div>`;
   }
-  return `<div class="brk-scroll"><div class="brk">${cols}</div></div>${third}`;
+  const legend=`<div class="brk-legend"><span class="lg lg-on">━━ affrontement confirmé</span><span class="lg lg-off">┄┄ à confirmer (structure)</span></div>`;
+  return legend+`<div class="brk-scroll"><div class="brk">${cols}</div></div>`+third;
 }
 
 /* ---------- INFOS (feed) ---------- */
