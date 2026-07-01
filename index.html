@@ -409,33 +409,38 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .prono .pmeta{grid-column:1/-1;font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
 .prono .pmeta .pacts{display:flex;gap:6px;margin-left:6px}
 .iconbtn.sm{width:30px;height:30px;border-radius:9px;font-size:14px}
-/* --- Tableau final (bracket) : vrai arbre, tours reliés par des connecteurs --- */
-.brk-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 16px}
+/* --- Tableau final (bracket) : arbre clair façon footmercato, connecteurs bleus --- */
+.brk-wrap{background:#f5f5f5;border-radius:14px;padding:16px 8px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.brk-legend{margin:0 0 12px;font-size:12px;color:#666;padding:0 6px}
 .brk{display:flex;align-items:stretch;min-width:max-content}
-.brk-col{display:flex;flex-direction:column;width:208px;min-width:208px}
-.brk-h{font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);text-align:center;padding:6px 4px 10px}
+.brk-col{display:flex;flex-direction:column;width:238px;min-width:238px}
+.brk-h{font-size:12px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#222;text-align:center;padding:2px 4px 14px}
 .brk-cells{flex:1;display:flex;flex-direction:column}
-.brk-cell{flex:1;display:flex;align-items:center;position:relative;padding:6px 24px 6px 0}
-/* Connecteurs : on ne dessine QUE les affrontements confirmés par un résultat
-   (le vainqueur est déjà placé dans le match suivant). Aucune branche devinée. */
-.brk-cell.lc-on::after{content:"";position:absolute;right:0;top:50%;width:24px;height:0;border-top:2px solid var(--line-2)}
-.brk-cell.vj-on::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid var(--line-2)}
-.brk-legend{margin:0 0 10px;font-size:11px;color:var(--muted-2)}
-.bm-ph .bm-nm.muted{color:var(--muted-2);font-style:italic;font-size:12px}
-.bm-ph .bm-row{padding:3px 0}
-.bm{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 9px;position:relative;z-index:1}
-.bm.live{border-color:var(--red)}
-.bm-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper);padding:2px 0}
-.bm-row .flag{flex:none}
-.bm-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brk-cell{flex:1;display:flex;align-items:center;position:relative;padding:10px 26px 10px 0}
+/* Connecteurs bleus : trait horizontal de chaque match + jointure verticale des paires
+   (structure officielle du tableau, confirmée : 16es apparies 2 a 2 -> 8es, etc.). */
+.brk-col:not(:last-child) .brk-cell::after{content:"";position:absolute;right:0;top:50%;width:26px;height:0;border-top:2px solid #3d5afe}
+.brk-col:not(:last-child) .brk-cell:nth-child(odd)::before{content:"";position:absolute;right:0;top:50%;height:100%;width:0;border-left:2px solid #3d5afe}
+.bm{width:100%;box-sizing:border-box;background:#fff;border:1px solid #e6e6e6;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:9px 11px;position:relative;z-index:1}
+.bm.live{border-color:#ef2b3d}
+.bm-date{position:absolute;top:-9px;right:9px;background:#333;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.2px}
+.bm-date.fin{background:#e8e8e8;color:#777}
+.bm-date.live{background:#ef2b3d}
+.bm-row{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#111;padding:5px 0}
+.bm-row+.bm-row{border-top:1px solid #eee}
+.bm-row .flag{flex:none;border-radius:3px}
+.bm-nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .bm-row.win .bm-nm{font-weight:800}
-.bm-row.out .bm-nm{color:var(--muted-2)}
-.bm-sc{font-family:'DM Mono';font-weight:700;font-size:14px;color:var(--muted)}
-.bm-row.win .bm-sc{color:var(--gold)}
-.bm-meta{margin-top:5px;font-size:10px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bm-meta .m6{color:#ffce3a}.bm-meta .bein{color:#7aa7ff}
-.brk-third{margin-top:12px;max-width:240px}
-.brk-third .brk-h{text-align:left;padding-left:2px}
+.bm-row.out{color:#999}.bm-row.out .bm-nm{color:#999}
+.bm-sc{font-weight:800;font-size:14px;color:#111}
+.bm-row.out .bm-sc{color:#999}
+.bm-arw{color:#3d5afe;font-size:12px;font-weight:900;margin-left:-2px}
+.bm-meta{margin-top:6px;padding-top:6px;border-top:1px solid #f0f0f0;font-size:10.5px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm-meta .m6{color:#c58a00}.bm-meta .bein{color:#2a4fd0}
+.bm-ph{background:#fafafa;border-style:dashed}
+.bm-ph .bm-nm{color:#999;font-style:italic;font-weight:500;font-size:12.5px}
+.brk-third{margin-top:14px;max-width:250px}
+.brk-third .brk-h{text-align:left;padding-left:2px;color:#222}
 .pbadge{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
 .pbadge.fin{color:var(--muted-2)}
 .pbadge.live{color:var(--red);border-color:var(--red)}
@@ -2940,22 +2945,32 @@ function brkWinnerId(m){
 function brkChildHas(child,id){
   return !!(child && id!=null && ((child.homeTeam&&child.homeTeam.id===id)||(child.awayTeam&&child.awayTeam.id===id)));
 }
-// Carte compacte d'un match dans l'arbre : 2 lignes (équipes + score), puis heure + chaînes.
+// Date courte "JJ/MM" (heure de Paris) pour le badge de la carte.
+function brkDay(utc){
+  try{return new Date(utc).toLocaleDateString("fr-FR",{timeZone:"Europe/Paris",day:"2-digit",month:"2-digit"})}
+  catch(e){return""}
+}
+// Carte de match façon footmercato : badge date en haut à droite, 2 lignes (drapeau +
+// équipe + score + flèche ▸ pour le qualifié), puis une ligne heure + chaînes TV.
 function brkCard(m){
   const home=apiTeamDisplay(m.homeTeam), away=apiTeamDisplay(m.awayTeam);
   const sc=(m.score&&m.score.fullTime)||{};
   const has=sc.home!=null && sc.away!=null;
+  const fin=m.status==="FINISHED";
   const live=m.status==="IN_PLAY"||m.status==="PAUSED";
   const win=brkWinnerId(m);
   const hWin=win!=null && m.homeTeam && m.homeTeam.id===win;
   const aWin=win!=null && m.awayTeam && m.awayTeam.id===win;
+  const badge=fin?'<span class="bm-date fin">Terminé</span>'
+    :live?'<span class="bm-date live">🔴 Live</span>'
+    :`<span class="bm-date">${brkDay(m.utcDate)}</span>`;
   const tvs=channelsFor(m).map(c=>c==="m6"?'<b class="m6">M6</b>':'<b class="bein">beIN</b>').join(" ");
-  const meta=`${live?'🔴 ':''}${brkWhen(m.utcDate)}${tvs?` · ${tvs}`:''}`;
-  const row=(t,scv,w,l)=>`<div class="bm-row ${w?'win':''} ${l?'out':''}">${t.flag}<span class="bm-nm">${t.name}</span>${has?`<span class="bm-sc">${scv}</span>`:''}</div>`;
-  return `<div class="bm ${live?'live':''}" id="brk-${m.id}">
+  const meta=fin?'':`<div class="bm-meta">${brkWhen(m.utcDate)}${tvs?` · ${tvs}`:''}</div>`;
+  const row=(t,scv,w,l)=>`<div class="bm-row ${w?'win':''} ${l?'out':''}">${t.flag}<span class="bm-nm">${t.name}</span>${has?`<span class="bm-sc">${scv}</span>`:''}${w?'<span class="bm-arw">▸</span>':''}</div>`;
+  return `<div class="bm ${live?'live':''}" id="brk-${m.id}">${badge}
     ${row(home,sc.home,hWin,win!=null&&!hWin)}
     ${row(away,sc.away,aWin,win!=null&&!aWin)}
-    <div class="bm-meta">${meta}</div>
+    ${meta}
   </div>`;
 }
 // Libellé d'un feeder pour une carte « à venir » : équipe qualifiée si connue,
@@ -3006,7 +3021,7 @@ function bracketHTML(){
   if(L32.length!==16){
     const cols=BRACKET_TREE_FALLBACK.filter(st=>byStage[st]).map(st=>
       `<div class="brk-col"><div class="brk-h">${stageLabel(st)}</div><div class="brk-cells">${sortById(byStage[st]).map(m=>`<div class="brk-cell">${brkCard(m)}</div>`).join("")}</div></div>`).join("");
-    return `<div class="brk-scroll"><div class="brk">${cols}</div></div>`;
+    return `<div class="brk-wrap"><div class="brk">${cols}</div></div>`;
   }
   // Nœuds-feuilles = 16es dans l'ordre du tableau.
   const leaves=L32.map(m=>({match:m,c1:null,c2:null,winner:brkWinnerId(m)}));
@@ -3030,21 +3045,9 @@ function bracketHTML(){
     {key:"LAST_32",nodes:leaves},{key:"LAST_16",nodes:r16},
     {key:"QUARTER_FINALS",nodes:qf},{key:"SEMI_FINALS",nodes:sf},{key:"FINAL",nodes:fn}
   ];
-  const cols=levels.map((lv,li)=>{
-    const last=li===levels.length-1;
-    const parents=last?null:levels[li+1].nodes;
-    const cells=lv.nodes.map((node,i)=>{
-      const parent=last?null:parents[Math.floor(i/2)];
-      const on=!last && parent && parent.match && brkChildHas(parent.match,node.winner); // lien confirmé par un résultat
-      const cls=["brk-cell"];
-      if(on)cls.push("lc-on");
-      if(!last && i%2===0){
-        const sib=lv.nodes[i+1];
-        const onSib=parent && parent.match && sib && brkChildHas(parent.match,sib.winner);
-        if(on && onSib)cls.push("vj-on");
-      }
-      return `<div class="${cls.join(' ')}">${brkNodeCard(node)}</div>`;
-    }).join("");
+  // Structure officielle confirmée -> on trace TOUT l'arbre (connecteurs CSS positionnels).
+  const cols=levels.map(lv=>{
+    const cells=lv.nodes.map(node=>`<div class="brk-cell">${brkNodeCard(node)}</div>`).join("");
     return `<div class="brk-col"><div class="brk-h">${stageLabel(lv.key)}</div><div class="brk-cells">${cells}</div></div>`;
   }).join("");
   // 3e place (petite finale) : hors arbre, affichée dessous.
@@ -3053,7 +3056,7 @@ function bracketHTML(){
     third=`<div class="brk-third"><div class="brk-h">${stageLabel("THIRD_PLACE")}</div>${brkCard(byStage.THIRD_PLACE[0])}</div>`;
   }
   const legend=`<div class="brk-legend">Ordre officiel du tableau · les affiches à venir indiquent d'où viennent les qualifiés ; les scores arrivent au fil des résultats.</div>`;
-  return legend+`<div class="brk-scroll"><div class="brk">${cols}</div></div>`+third;
+  return `<div class="brk-wrap">${legend}<div class="brk">${cols}</div>${third}</div>`;
 }
 const BRACKET_TREE_FALLBACK=["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL"];
 
