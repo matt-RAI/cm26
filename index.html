@@ -2509,7 +2509,49 @@ function renderRival(){
     </div>`;
   }
 
-  view.innerHTML=back+hero+tourPanel+body;
+  // ---- Ses duels de l'Aigle (pierre-feuille-ciseaux) : terminés + forfaits, PUBLIC ----
+  const duelPanel=renderRivalDuels(id, me);
+
+  view.innerHTML=back+hero+tourPanel+body+duelPanel;
+}
+
+// Panneau "duels de l'Aigle" d'un joueur — consultable par tous (dans sa fiche).
+// N'affiche que les duels TERMINÉS ou perdus par FORFAIT (jamais les défis en cours).
+function renderRivalDuels(id, me){
+  const list=(lbCache.duels||[]).filter(d=>(d.challenger===id||d.opponent===id)&&(d.status==="done"||duelExpired(d)))
+    .sort((a,b)=>String(b.resolved_at||b.created_at||"").localeCompare(String(a.resolved_at||a.created_at||"")));
+  if(!list.length){
+    return `<div class="panel" style="margin-top:12px">
+      <h3>⚔️ Ses duels de l'Aigle</h3>
+      <p class="sub">${me?"Tu n'as":"Ce joueur n'a"} pas encore joué de pierre-feuille-ciseaux.</p></div>`;
+  }
+  const emo=m=>DUEL_MOVES[m]?DUEL_MOVES[m].emo:"?";
+  let w=0,l=0,t=0,net=0;
+  const rowsHtml=list.map(d=>{
+    const isA=d.challenger===id;                         // ce joueur est-il le provocateur ?
+    const other=pseudoById(isA?d.opponent:d.challenger);
+    const forfeit=d.status!=="done";
+    let cls,badge,txt,moves="";
+    if(!forfeit && d.result==="tie"){
+      t++; cls=""; badge=`<span class="ptsbadge g0">nul · 0</span>`; txt=`Nul contre <b>${escAttr(other)}</b>`;
+      moves=` <span class="dwait">(${emo(isA?d.move_a:d.move_b)} vs ${emo(isA?d.move_b:d.move_a)})</span>`;
+    }else{
+      const won=forfeit?isA:((d.result==="a"&&isA)||(d.result==="b"&&!isA));
+      if(!forfeit)moves=` <span class="dwait">(${emo(isA?d.move_a:d.move_b)} vs ${emo(isA?d.move_b:d.move_a)})</span>`;
+      if(won){ w++; net+=d.stake; cls="win"; badge=`<span class="ptsbadge g3">+${d.stake}</span>`;
+        txt=forfeit?`Gagne par <b>forfait</b> contre <b>${escAttr(other)}</b>`:`Bat <b>${escAttr(other)}</b>`; }
+      else{ l++; net-=d.stake; cls="lose"; badge=`<span class="ptsbadge g0" style="color:var(--red);border-color:var(--red)">−${d.stake}</span>`;
+        txt=forfeit?`<b>Forfait</b> contre <b>${escAttr(other)}</b> <span class="dwait">(pas répondu à temps)</span>`:`Battu par <b>${escAttr(other)}</b>`; }
+    }
+    return `<div class="duelrow ${cls}"><span class="dtxt">${forfeit?"🏳️ ":"⚔️ "}${txt}${moves}</span>${badge}</div>`;
+  }).join("");
+  const s=n=>n>1?"s":"";
+  const bilan=`${w} gagné${s(w)} · ${l} perdu${s(l)} · ${t} nul${s(t)} · solde <b style="color:${net>=0?'#34c77b':'var(--red)'}">${net>=0?"+":""}${net} pts</b>`;
+  return `<div class="panel" style="margin-top:12px">
+    <h3>⚔️ Ses duels de l'Aigle</h3>
+    <p class="sub">Pierre-feuille-ciseaux joués — ${bilan}</p>
+    <div style="margin-top:8px">${rowsHtml}</div>
+  </div>`;
 }
 
 /* ============================================================
