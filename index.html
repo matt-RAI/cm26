@@ -500,6 +500,32 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .newsbtn{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;font-family:'Archivo';
   font-weight:700;font-size:15px;padding:13px;cursor:pointer;transition:.15s}
 .newsbtn:hover{background:#ff4659;transform:translateY(-1px)}
+/* ---- Duels de l'Aigle (pierre-feuille-ciseaux) ---- */
+.duelbox{margin-top:18px;border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--panel-2)}
+.duelbox h4{font-family:'Archivo';font-weight:700;font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:7px}
+.duelbox .dsub{color:var(--muted-2);font-size:12.5px;margin:0 0 14px}
+.duelform{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.duelform select,.duelform input{background:var(--panel);border:1px solid var(--line);color:var(--paper);
+  border-radius:10px;padding:9px 11px;font-size:13.5px;font-family:inherit}
+.duelform input[type=number]{width:92px}
+.duelmvs{display:inline-flex;gap:6px}
+.duelmv{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:42px;height:40px;
+  font-size:19px;cursor:pointer;transition:.15s;line-height:1}
+.duelmv:hover{border-color:var(--muted-2);transform:translateY(-1px)}
+.duelmv.on{border-color:var(--red);background:rgba(239,43,61,.16);box-shadow:0 0 0 2px rgba(239,43,61,.25)}
+.duelsend{background:var(--red);color:#fff;border:none;border-radius:10px;font-family:'Archivo';font-weight:700;
+  font-size:13.5px;padding:10px 16px;cursor:pointer;transition:.15s}
+.duelsend:hover{background:#ff4659;transform:translateY(-1px)}
+.duelsend:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.duelgroup{margin-top:15px}
+.duelgroup .dgl{font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted-2);margin:0 0 8px}
+.duelrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+  background:var(--panel);margin-bottom:8px;font-size:13.5px}
+.duelrow .dtxt{flex:1;line-height:1.35}
+.duelrow .dtxt b{color:var(--paper)}
+.duelrow .dwait{color:var(--muted-2);font-size:12px}
+.duelrow.win{border-color:#34c77b}
+.duelrow.lose{border-color:var(--red)}
 .matchprev{background:var(--ink-2);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:18px;
   display:flex;align-items:center;justify-content:center;gap:14px}
 .matchprev .mp-t{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
@@ -854,6 +880,11 @@ footer b{color:var(--muted)}
 <!-- NEWS MODAL (annonce des nouveautés, fermable définitivement) -->
 <div class="overlay" id="newsOverlay">
   <div class="modal" id="newsModal"></div>
+</div>
+
+<!-- INTRO "Duel de l'Aigle" (pierre-feuille-ciseaux) — vue une seule fois -->
+<div class="overlay" id="duelOverlay">
+  <div class="modal" id="duelModal"></div>
 </div>
 
 <div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
@@ -1988,10 +2019,26 @@ async function loadLeaderboard(){
     const membersByOrga={};
     (mem.data||[]).forEach(m=>{(membersByOrga[m.orga_id]=membersByOrga[m.orga_id]||new Set()).add(m.user_id)});
 
-    // On conserve aussi les pronos par joueur (matchByUser/tourByUser), les résultats et le bonus
-    // Outsider : c'est exactement ce qu'il faut pour afficher la fiche "pronos passés" d'un rival
-    // (renderRival) sans refaire de requête.
-    lbCache={profiles:pf.data||[], pointsByUser, membersByOrga, matchByUser, tourByUser, results, outsiderByMatch};
+    // --- Duels de l'Aigle (pierre-feuille-ciseaux) : SOMME NULLE. Chaque duel terminé
+    //     transfère la mise du perdant au gagnant (nul = 0). On lit la VUE `duels_pub`
+    //     (le coup du provocateur y est masqué tant que le duel n'est pas résolu).
+    //     Tolérant : si la table/vue n'existe pas encore, on continue sans duels. ---
+    let duels=[];
+    try{
+      const dq=await supabase.from("duels_pub").select("id,challenger,opponent,stake,move_a,move_b,status,result,created_at,resolved_at");
+      if(!dq.error && Array.isArray(dq.data)) duels=dq.data;
+    }catch(e){ duels=[]; }
+    duels.forEach(d=>{
+      if(d.status!=="done" || !d.result || d.result==="tie") return;
+      const s=Number(d.stake)||0;
+      if(d.result==="a"){ pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)+s; pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)-s; }
+      else if(d.result==="b"){ pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)+s; pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)-s; }
+    });
+
+    // On conserve aussi les pronos par joueur (matchByUser/tourByUser), les résultats, le bonus
+    // Outsider et les duels : c'est exactement ce qu'il faut pour afficher la fiche "pronos
+    // passés" d'un rival (renderRival) et le panneau Duels sans refaire de requête.
+    lbCache={profiles:pf.data||[], pointsByUser, membersByOrga, matchByUser, tourByUser, results, outsiderByMatch, duels};
   }finally{
     lbLoading=false;
   }
@@ -2128,7 +2175,121 @@ function renderClassement(){
     ${body}
     ${note}
     <button class="chip" style="margin-top:16px" onclick="refreshLeaderboard()">↻ Rafraîchir</button>
+  </div>`+renderDuels();
+}
+
+/* ============================================================
+   DUELS DE L'AIGLE — pierre / feuille / ciseaux entre joueurs
+   Mise libre (tu choisis les points), adversaire au choix. Somme nulle :
+   le gagnant prend la mise au perdant (nul = 0). Le coup du provocateur est
+   résolu CÔTÉ SERVEUR (fonction Supabase play_duel) → impossible de tricher
+   en lisant l'API avant de jouer.
+============================================================ */
+const DUEL_MOVES={pierre:{emo:"✊",lab:"Pierre"},feuille:{emo:"✋",lab:"Feuille"},ciseaux:{emo:"✌️",lab:"Ciseaux"}};
+let _duelMove=null;   // coup sélectionné dans le formulaire "Défier un joueur"
+
+function pseudoById(id){
+  const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===id);
+  return p?(p.pseudo||"—"):"un joueur";
+}
+function pickDuelMove(mv,ev){
+  _duelMove=mv;
+  document.querySelectorAll(".duelform .duelmv").forEach(b=>b.classList.toggle("on",b.dataset.mv===mv));
+  if(ev)ev.preventDefault();
+}
+function mvBtns(handler){
+  return `<span class="duelmvs">`+Object.keys(DUEL_MOVES).map(m=>
+    `<button class="duelmv" data-mv="${m}" title="${DUEL_MOVES[m].lab}" onclick="${handler}">${DUEL_MOVES[m].emo}</button>`
+  ).join("")+`</span>`;
+}
+
+function renderDuels(){
+  if(!state.user||!lbCache)return "";
+  const me=state.user.id;
+  const duels=lbCache.duels||[];
+  const others=(lbCache.profiles||[]).filter(p=>p.id!==me)
+    .sort((a,b)=>(a.pseudo||"").localeCompare(b.pseudo||"","fr"));
+
+  // Formulaire "Défier un joueur"
+  const opts=others.map(p=>`<option value="${p.id}">${escAttr(p.pseudo||"—")}</option>`).join("");
+  const form=`<div class="duelform">
+      <select id="duelOpp">${opts||`<option value="">Aucun autre joueur</option>`}</select>
+      <input id="duelStake" type="number" min="1" max="500" step="1" value="5" title="Mise en points" aria-label="Mise en points"> <span class="dwait">pts</span>
+      ${mvBtns("pickDuelMove(this.dataset.mv,event)")}
+      <button class="duelsend" onclick="createDuel()">Lancer le défi ⚔️</button>
+    </div>`;
+
+  // Défis REÇUS (à jouer)
+  const received=duels.filter(d=>d.status==="pending"&&d.opponent===me);
+  const recHtml=received.map(d=>`<div class="duelrow">
+      <span class="dtxt"><b>${escAttr(pseudoById(d.challenger))}</b> te défie · <b>${d.stake} pts</b><br><span class="dwait">Choisis ton coup :</span></span>
+      ${mvBtns(`respondDuel('${d.id}',this.dataset.mv)`)}
+    </div>`).join("");
+
+  // Défis ENVOYÉS (en attente)
+  const sent=duels.filter(d=>d.status==="pending"&&d.challenger===me);
+  const sentHtml=sent.map(d=>`<div class="duelrow">
+      <span class="dtxt">Tu défies <b>${escAttr(pseudoById(d.opponent))}</b> · <b>${d.stake} pts</b><br><span class="dwait">En attente de sa réponse…</span></span>
+    </div>`).join("");
+
+  // HISTORIQUE (duels terminés me concernant)
+  const hist=duels.filter(d=>d.status==="done"&&(d.challenger===me||d.opponent===me))
+    .sort((a,b)=>String(b.resolved_at||"").localeCompare(String(a.resolved_at||""))).slice(0,12);
+  const histHtml=hist.map(d=>{
+    const iAmA=d.challenger===me;
+    const other=pseudoById(iAmA?d.opponent:d.challenger);
+    const myMv=iAmA?d.move_a:d.move_b, opMv=iAmA?d.move_b:d.move_a;
+    const iWon=(d.result==="a"&&iAmA)||(d.result==="b"&&!iAmA);
+    const tie=d.result==="tie";
+    const cls=tie?"":(iWon?"win":"lose");
+    const badge=tie?`<span class="ptsbadge g0">nul · 0</span>`
+      :(iWon?`<span class="ptsbadge g3">+${d.stake}</span>`:`<span class="ptsbadge g0" style="color:var(--red);border-color:var(--red)">−${d.stake}</span>`);
+    const emo=m=>DUEL_MOVES[m]?DUEL_MOVES[m].emo:"?";
+    const verb=tie?`Nul contre <b>${escAttr(other)}</b>`:(iWon?`Tu bats <b>${escAttr(other)}</b>`:`<b>${escAttr(other)}</b> te bat`);
+    return `<div class="duelrow ${cls}">
+      <span class="dtxt">${verb} <span class="dwait">(${emo(myMv)} vs ${emo(opMv)})</span></span>${badge}</div>`;
+  }).join("");
+
+  const group=(label,html)=>html?`<div class="duelgroup"><p class="dgl">${label}</p>${html}</div>`:"";
+
+  return `<div class="panel" style="margin-top:16px">
+    <div class="duelbox" style="margin-top:0">
+      <h4>⚔️ Duels de l'Aigle</h4>
+      <p class="dsub">Pierre-feuille-ciseaux. Choisis un adversaire, ta mise et ton coup — le gagnant rafle la mise. Ton coup reste secret jusqu'à sa réponse.</p>
+      ${form}
+      ${group(`Défis reçus (${received.length})`,recHtml)}
+      ${group("En attente",sentHtml)}
+      ${group("Historique",histHtml)}
+    </div>
   </div>`;
+}
+
+async function createDuel(){
+  if(!state.user){toast("Connecte-toi pour lancer un duel");return}
+  if(!lbCache){toast("Classement en cours de chargement…");return}
+  const opp=(document.getElementById("duelOpp")||{}).value||"";
+  const stake=Math.floor(Number((document.getElementById("duelStake")||{}).value));
+  if(!opp){toast("Choisis un adversaire");return}
+  if(!Number.isFinite(stake)||stake<1){toast("Mise invalide (minimum 1 pt)");return}
+  if(stake>500){toast("Mise maximum : 500 pts");return}
+  if(!_duelMove){toast("Choisis ton coup ✊ ✋ ✌️");return}
+  const {error}=await supabase.from("duels").insert(
+    {challenger:state.user.id,opponent:opp,stake,move_a:_duelMove,status:"pending"});
+  if(error){toast("Duel impossible : "+error.message);return}
+  _duelMove=null;
+  toast("Défi envoyé ⚔️ — en attente de sa réponse");
+  lbCache=null; render();
+}
+
+async function respondDuel(id,move){
+  if(!state.user)return;
+  if(!DUEL_MOVES[move]){toast("Coup invalide");return}
+  const {data,error}=await supabase.rpc("play_duel",{p_duel:id,p_move:move});
+  if(error){toast("Réponse impossible : "+error.message);return}
+  // data = 'a' (provocateur gagne) | 'b' (moi, l'adversaire, gagne) | 'tie'
+  const msg = data==="b" ? "Gagné ! 🦅 tu rafles la mise" : data==="a" ? "Perdu… 😬" : "Match nul 🤝";
+  toast(msg);
+  lbCache=null; render();
 }
 
 /* ============================================================
@@ -3304,6 +3465,33 @@ function dismissNews(){
   try{ store.set("cm26_news_seen",NEWS_VERSION); }catch(e){}
   const ov=document.getElementById("newsOverlay");
   if(ov)ov.classList.remove("on");
+  maybeShowDuelIntro();   // enchaîne sur l'intro des Duels (sans chevaucher la modale news)
+}
+
+/* ---- Intro "Duel de l'Aigle" (vue une seule fois par navigateur) ---- */
+function maybeShowDuelIntro(){
+  try{ if(store.get("cm26_duel_intro_seen",false))return; }catch(e){}
+  // ne pas empiler par-dessus la modale "nouveautés" si elle est encore ouverte
+  const news=document.getElementById("newsOverlay");
+  if(news&&news.classList.contains("on"))return;
+  const ov=document.getElementById("duelOverlay"), md=document.getElementById("duelModal");
+  if(!ov||!md)return;
+  md.innerHTML=`<h3>⚔️ Nouveau : le Duel de l'Aigle !</h3>
+    <p class="msub">Pierre 🪨 · Feuille 📄 · Ciseaux ✂️ — mais pour des points.</p>
+    <ul class="newslist">
+      <li><b>🎯 Défie qui tu veux</b> — choisis n'importe quel joueur de la bande.</li>
+      <li><b>💰 Mise libre</b> — tu décides du nombre de points en jeu (1 à 500).</li>
+      <li><b>🤫 Coup secret</b> — ton choix reste caché tant que l'autre n'a pas répondu, la résolution est faite côté serveur : zéro triche possible.</li>
+      <li><b>⚖️ Somme nulle</b> — le gagnant prend la mise au perdant, égalité = 0. De quoi <b>renverser le classement</b> sur un coup de bluff !</li>
+    </ul>
+    <p class="msub" style="margin:0 0 18px">👉 Ça se passe dans l'onglet <b>🏆 Classement</b>, tout en bas.</p>
+    <button class="newsbtn" onclick="dismissDuelIntro()">✓ Compris, à l'attaque !</button>`;
+  ov.classList.add("on");
+}
+function dismissDuelIntro(){
+  try{ store.set("cm26_duel_intro_seen",true); }catch(e){}
+  const ov=document.getElementById("duelOverlay");
+  if(ov)ov.classList.remove("on");
 }
 
 if(isDashboardRoute())state.view="dashboard"; // page admin privée (sécurité re-vérifiée côté serveur)
@@ -3311,6 +3499,7 @@ else { const _lv=legalRouteView(); if(_lv)state.view=_lv; } // pages légales vi
 renderAuth();
 render();
 maybeShowNews();    // modale "nouveautés" au premier chargement (jusqu'au clic "J'ai compris")
+maybeShowDuelIntro();  // intro "Duel de l'Aigle" (si la modale news n'est pas déjà affichée)
 initSupabaseAuth(); // vérifie la session Google et met à jour le header
 syncResults();      // synchro auto des résultats au chargement (non bloquant)
 // navigation historique : état de base pour le bouton "Précédent"
