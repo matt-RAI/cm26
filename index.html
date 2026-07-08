@@ -2369,7 +2369,15 @@ async function refreshDuelAlert(){
     const {data}=await supabase.from("duels_pub")
       .select("id,challenger,stake,status,created_at").eq("opponent",state.user.id).eq("status","pending");
     const now=Date.now();
-    state.duelAlert=(data||[]).filter(d=>d.created_at && (now-new Date(d.created_at).getTime())<=DUEL_DEADLINE_MS);
+    const live=(data||[]).filter(d=>d.created_at && (now-new Date(d.created_at).getTime())<=DUEL_DEADLINE_MS);
+    // Pseudos des provocateurs → pour nommer l'alerte sur toutes les pages (même sans lbCache).
+    let names={};
+    const ids=[...new Set(live.map(d=>d.challenger))];
+    if(ids.length){
+      const {data:profs}=await supabase.from("profiles").select("id,pseudo").in("id",ids);
+      (profs||[]).forEach(p=>{ names[p.id]=p.pseudo||"un joueur"; });
+    }
+    state.duelAlert=live.map(d=>({...d,challengerName:names[d.challenger]||null}));
   }catch(e){ state.duelAlert=[]; }
   paintDuelAlert();
 }
@@ -2383,8 +2391,8 @@ function paintDuelAlert(){
   if(!list.length){ box.classList.remove("on"); box.innerHTML=""; return; }
   const n=list.length;
   // nom du provocateur (via lbCache si dispo) + plus petit temps restant
-  const nameOf=id=>{ const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===id); return p?(p.pseudo||"un joueur"):"un joueur"; };
-  const who = n===1 ? `<b>${escAttr(nameOf(list[0].challenger))}</b> t'a lancé un défi ⚔️`
+  const nameOf=d=>{ if(d.challengerName)return d.challengerName; const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===d.challenger); return p?(p.pseudo||"un joueur"):"un joueur"; };
+  const who = n===1 ? `<b>${escAttr(nameOf(list[0]))}</b> t'a lancé un défi ⚔️`
                     : `<b>${n} joueurs</b> t'ont lancé un défi ⚔️`;
   const soonest=list.map(d=>duelLeft(d.created_at)).filter(Boolean)[0];
   const stakeTxt = n===1 ? ` · ${list[0].stake} pts en jeu` : "";
