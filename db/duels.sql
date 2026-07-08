@@ -16,7 +16,7 @@ create table if not exists public.duels (
   id          uuid primary key default gen_random_uuid(),
   challenger  uuid not null references auth.users(id) on delete cascade,
   opponent    uuid not null references auth.users(id) on delete cascade,
-  stake       int  not null check (stake > 0 and stake <= 500),
+  stake       int  not null check (stake in (10, 20, 30)),
   move_a      text not null check (move_a in ('pierre','feuille','ciseaux')),
   move_b      text          check (move_b in ('pierre','feuille','ciseaux')),
   status      text not null default 'pending' check (status in ('pending','done')),
@@ -62,6 +62,12 @@ begin
   if not found then raise exception 'Duel introuvable'; end if;
   if d.opponent <> auth.uid() then raise exception 'Ce duel ne t''est pas destiné'; end if;
   if d.status <> 'pending' then raise exception 'Duel déjà joué'; end if;
+  -- Réponse obligatoire sous 24 h : passé ce délai, le défi est perdu par forfait
+  -- (les points vont au provocateur, comptabilisés côté classement). On refuse donc
+  -- toute réponse tardive pour que le forfait ne puisse pas être « annulé » après coup.
+  if now() - d.created_at > interval '24 hours' then
+    raise exception 'Délai de réponse dépassé (24 h) : défi perdu par forfait';
+  end if;
   if p_move not in ('pierre','feuille','ciseaux') then raise exception 'Coup invalide'; end if;
 
   if d.move_a = p_move then
