@@ -507,6 +507,24 @@ nav{position:sticky;top:0;z-index:25;margin:16px 0 26px;padding:8px 0;
 .duelrule{font-size:12.5px;line-height:1.4;color:var(--muted);background:rgba(239,43,61,.10);
   border:1px solid rgba(239,43,61,.35);border-radius:10px;padding:9px 12px;margin:0 0 14px}
 .duelrule b{color:var(--paper)}
+/* ALERTE défi reçu — énorme et animée */
+.badge-duel{background:#ffce3a;color:#4a2c00}
+.duelalert{display:none;margin:14px 0 0;border-radius:16px;padding:15px 18px;
+  background:linear-gradient(100deg,#ef2b3d,#ff7a1a);border:2px solid #ffce3a;
+  box-shadow:0 8px 30px rgba(239,43,61,.4);align-items:center;gap:15px;flex-wrap:wrap;
+  animation:duelglow 1.6s ease-in-out infinite}
+.duelalert.on{display:flex}
+.duelalert .da-ic{font-size:34px;line-height:1;animation:duelshake 1s ease-in-out infinite;transform-origin:50% 60%}
+.duelalert .da-txt{flex:1;min-width:210px;color:#fff}
+.duelalert .da-h{font-family:'Archivo';font-weight:800;font-size:17px;letter-spacing:-.3px}
+.duelalert .da-s{font-size:13px;opacity:.96;margin-top:2px}
+.duelalert .da-s b{color:#fff2c2}
+.duelalert .da-btn{background:#fff;color:#c1121f;border:none;border-radius:12px;
+  font-family:'Archivo';font-weight:800;font-size:15px;padding:12px 22px;cursor:pointer;
+  white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.18);transition:.15s}
+.duelalert .da-btn:hover{transform:translateY(-2px);box-shadow:0 5px 0 rgba(0,0,0,.18)}
+@keyframes duelglow{0%,100%{box-shadow:0 8px 26px rgba(239,43,61,.35)}50%{box-shadow:0 10px 40px rgba(255,206,58,.7)}}
+@keyframes duelshake{0%,100%{transform:rotate(-13deg)}50%{transform:rotate(13deg)}}
 .duelform{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
 .duelform select,.duelform input{background:var(--panel);border:1px solid var(--line);color:var(--paper);
   border-radius:10px;padding:9px 11px;font-size:13.5px;font-family:inherit}
@@ -838,7 +856,7 @@ footer b{color:var(--muted)}
     <div class="tabs" id="tabs">
       <span class="navgroup">Jeu</span>
       <button class="tab on" data-v="pronos">⚽ Matchs &amp; Pronos</button>
-      <button class="tab" data-v="classement">🏆 Classement</button>
+      <button class="tab" data-v="classement">🏆 Classement <span class="badge badge-duel" id="duelTabBadge" style="display:none">0</span></button>
       <span class="navsep" aria-hidden="true"></span>
       <span class="navgroup">Tournoi</span>
       <button class="tab" data-v="news">📰 News Fresh</button>
@@ -846,6 +864,9 @@ footer b{color:var(--muted)}
       <button class="tab" data-v="groupes">🗂️ Groupes &amp; Résultats</button>
     </div>
   </nav>
+
+  <!-- ALERTE "on t'a lancé un défi" — très visible, sur toutes les pages -->
+  <div class="duelalert" id="duelAlert"></div>
 
   <main id="view"></main>
 
@@ -1270,6 +1291,8 @@ async function initSupabaseAuth(){
     const {data:{session}}=await supabase.auth.getSession();
     applySupabaseSession(session);
     supabase.auth.onAuthStateChange((_event,session)=>applySupabaseSession(session));
+    // Rafraîchit périodiquement l'alerte "défi reçu" (si un pote te défie pendant ta visite)
+    if(!window._duelAlertTimer) window._duelAlertTimer=setInterval(()=>{ if(state.user)refreshDuelAlert(); },90000);
   }catch(e){
     console.error("Supabase init échouée",e);
   }
@@ -1293,6 +1316,7 @@ async function loadUserData(userId){
   await loadTournamentPredictions(userId);
   await loadMatchPredictions(userId);
   renderAuth();render();
+  refreshDuelAlert(); // vérifie les défis reçus dès la connexion
 }
 
 // Charge les pronos de match de l'utilisateur (Supabase = source de vérité).
@@ -1637,6 +1661,7 @@ function renderPrivacy(){
 function render(){
   const wl=document.getElementById("wlBadge");
   if(wl){const n=state.watch.length; wl.textContent=n; wl.style.display=n>0?"":"none";} // badge masqué si vide
+  paintDuelAlert(); // bannière/badge "défi reçu" (persistants, hors de #view)
   if(state.view==="watchlist")return renderWatchlist();
   if(state.view==="pronos")return renderPronos();
   if(state.view==="classement")return renderClassement();
@@ -2321,7 +2346,7 @@ async function createDuel(){
   if(error){toast("Duel impossible : "+error.message);return}
   _duelMove=null;
   toast("Défi envoyé ⚔️ — en attente de sa réponse");
-  lbCache=null; render();
+  lbCache=null; refreshDuelAlert(); render();
 }
 
 async function respondDuel(id,move){
@@ -2332,7 +2357,49 @@ async function respondDuel(id,move){
   // data = 'a' (provocateur gagne) | 'b' (moi, l'adversaire, gagne) | 'tie'
   const msg = data==="b" ? "Gagné ! 🦅 tu rafles la mise" : data==="a" ? "Perdu… 😬" : "Match nul 🤝";
   toast(msg);
-  lbCache=null; render();
+  lbCache=null; refreshDuelAlert(); render();
+}
+
+/* ---- ALERTE "on t'a lancé un défi" : bannière géante + badge, sur toutes les pages ---- */
+// Récupère les défis EN ATTENTE qui me sont adressés (non expirés) via une requête légère,
+// indépendante du classement, pour que l'alerte s'affiche quel que soit l'onglet.
+async function refreshDuelAlert(){
+  if(!supabase||!state.user){ state.duelAlert=[]; paintDuelAlert(); return; }
+  try{
+    const {data}=await supabase.from("duels_pub")
+      .select("id,challenger,stake,status,created_at").eq("opponent",state.user.id).eq("status","pending");
+    const now=Date.now();
+    state.duelAlert=(data||[]).filter(d=>d.created_at && (now-new Date(d.created_at).getTime())<=DUEL_DEADLINE_MS);
+  }catch(e){ state.duelAlert=[]; }
+  paintDuelAlert();
+}
+// Peint la bannière (#duelAlert) + le badge d'onglet à partir de state.duelAlert.
+function paintDuelAlert(){
+  const list=state.duelAlert||[];
+  const badge=document.getElementById("duelTabBadge");
+  if(badge){ badge.textContent=list.length; badge.style.display=list.length?"":"none"; }
+  const box=document.getElementById("duelAlert");
+  if(!box)return;
+  if(!list.length){ box.classList.remove("on"); box.innerHTML=""; return; }
+  const n=list.length;
+  // nom du provocateur (via lbCache si dispo) + plus petit temps restant
+  const nameOf=id=>{ const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===id); return p?(p.pseudo||"un joueur"):"un joueur"; };
+  const who = n===1 ? `<b>${escAttr(nameOf(list[0].challenger))}</b> t'a lancé un défi ⚔️`
+                    : `<b>${n} joueurs</b> t'ont lancé un défi ⚔️`;
+  const soonest=list.map(d=>duelLeft(d.created_at)).filter(Boolean)[0];
+  const stakeTxt = n===1 ? ` · ${list[0].stake} pts en jeu` : "";
+  box.innerHTML=`<span class="da-ic">⚔️</span>
+    <div class="da-txt">
+      <div class="da-h">${who}</div>
+      <div class="da-s">Réponds vite au pierre-feuille-ciseaux${stakeTxt} — ${soonest?`il te reste <b>${soonest}</b>, `:""}sinon tu perds par <b>forfait</b> !</div>
+    </div>
+    <button class="da-btn" onclick="gotoDuels()">Répondre maintenant →</button>`;
+  box.classList.add("on");
+}
+// Va sur le Classement et fait défiler jusqu'au panneau des duels.
+function gotoDuels(){
+  go("classement");
+  setTimeout(()=>{ const el=document.querySelector(".duelbox"); if(el)el.scrollIntoView({behavior:"smooth",block:"center"}); },350);
 }
 
 /* ============================================================
@@ -3511,9 +3578,11 @@ function dismissNews(){
   maybeShowDuelIntro();   // enchaîne sur l'intro des Duels (sans chevaucher la modale news)
 }
 
-/* ---- Intro "Duel de l'Aigle" (vue une seule fois par navigateur) ---- */
+/* ---- Intro "Duel de l'Aigle" (revue à chaque nouvelle version) ---- */
+// Bumper DUEL_INTRO_VERSION pour ré-afficher l'intro à TOUT le monde.
+const DUEL_INTRO_VERSION="2026-07-08b";
 function maybeShowDuelIntro(){
-  try{ if(store.get("cm26_duel_intro_seen",false))return; }catch(e){}
+  try{ if(store.get("cm26_duel_intro_seen","")===DUEL_INTRO_VERSION)return; }catch(e){}
   // ne pas empiler par-dessus la modale "nouveautés" si elle est encore ouverte
   const news=document.getElementById("newsOverlay");
   if(news&&news.classList.contains("on"))return;
@@ -3533,7 +3602,7 @@ function maybeShowDuelIntro(){
   ov.classList.add("on");
 }
 function dismissDuelIntro(){
-  try{ store.set("cm26_duel_intro_seen",true); }catch(e){}
+  try{ store.set("cm26_duel_intro_seen",DUEL_INTRO_VERSION); }catch(e){}
   const ov=document.getElementById("duelOverlay");
   if(ov)ov.classList.remove("on");
 }
