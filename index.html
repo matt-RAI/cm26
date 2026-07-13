@@ -2056,17 +2056,11 @@ async function loadLeaderboard(){
       const dq=await supabase.from("duels_pub").select("id,challenger,opponent,stake,move_a,move_b,status,result,created_at,resolved_at");
       if(!dq.error && Array.isArray(dq.data)) duels=dq.data;
     }catch(e){ duels=[]; }
-    const _nowMs=Date.now();
     duels.forEach(d=>{
+      if(d.status!=="done" || !d.result || d.result==="tie") return; // seuls les duels JOUÉS comptent
       const s=Number(d.stake)||0;
-      if(d.status==="done"){
-        if(d.result==="a"){ pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)+s; pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)-s; }
-        else if(d.result==="b"){ pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)+s; pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)-s; }
-        // result === "tie" -> 0 pour les deux
-      }else if(d.status==="pending" && d.created_at && (_nowMs-new Date(d.created_at).getTime())>DUEL_DEADLINE_MS){
-        // FORFAIT : pas de réponse sous 24 h -> le provocateur gagne la mise.
-        pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)+s; pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)-s;
-      }
+      if(d.result==="a"){ pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)+s; pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)-s; }
+      else if(d.result==="b"){ pointsByUser[d.opponent]=(pointsByUser[d.opponent]||0)+s; pointsByUser[d.challenger]=(pointsByUser[d.challenger]||0)-s; }
     });
 
     // On conserve aussi les pronos par joueur (matchByUser/tourByUser), les résultats, le bonus
@@ -2220,23 +2214,8 @@ function renderClassement(){
    en lisant l'API avant de jouer.
 ============================================================ */
 const DUEL_MOVES={pierre:{emo:"✊",lab:"Pierre"},feuille:{emo:"✋",lab:"Feuille"},ciseaux:{emo:"✌️",lab:"Ciseaux"}};
-const DUEL_DEADLINE_MS=24*60*60*1000;   // 24 h pour répondre, sinon FORFAIT (points au provocateur)
 let _duelMove=null;   // coup sélectionné dans le formulaire "Défier un joueur"
 
-// Un duel PENDING dont le coup d'envoi remonte à plus de 24 h : l'adversaire n'a pas
-// répondu → forfait (le provocateur gagne). Calculé côté client (aucune écriture requise).
-function duelExpired(d){
-  return d && d.status==="pending" && d.created_at &&
-    (Date.now()-new Date(d.created_at).getTime())>DUEL_DEADLINE_MS;
-}
-// Temps restant avant forfait, formaté (ou null si expiré).
-function duelLeft(created_at){
-  if(!created_at)return null;
-  const ms=DUEL_DEADLINE_MS-(Date.now()-new Date(created_at).getTime());
-  if(ms<=0)return null;
-  const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
-  return h>0?`${h} h ${m<10?"0"+m:m}`:`${m} min`;
-}
 function pseudoById(id){
   const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===id);
   return p?(p.pseudo||"—"):"un joueur";
@@ -2270,42 +2249,31 @@ function renderDuels(){
       <button class="duelsend" onclick="createDuel()">Lancer le défi ⚔️</button>
     </div>`;
 
-  // Défis REÇUS encore valides (non expirés) → réponse OBLIGATOIRE sous 24 h.
-  const received=duels.filter(d=>d.status==="pending"&&d.opponent===me&&!duelExpired(d));
+  // Défis REÇUS (à jouer) — aucune limite de temps.
+  const received=duels.filter(d=>d.status==="pending"&&d.opponent===me);
   const recHtml=received.map(d=>{
-    const left=duelLeft(d.created_at);
     return `<div class="duelrow">
       <span class="dtxt"><b>${escAttr(pseudoById(d.challenger))}</b> te défie · <b>${d.stake} pts</b><br>
-        <span class="dwait">⏱️ Réponse obligatoire — il te reste <b>${left}</b>, sinon tu perds par forfait. Choisis ton coup :</span></span>
+        <span class="dwait">Choisis ton coup :</span></span>
       ${mvBtns(`respondDuel('${d.id}',this.dataset.mv)`)}
     </div>`;
   }).join("");
 
-  // Défis ENVOYÉS en attente (non expirés) : compte à rebours du forfait EN TA faveur.
-  const sent=duels.filter(d=>d.status==="pending"&&d.challenger===me&&!duelExpired(d));
+  // Défis ENVOYÉS (en attente de la réponse de l'adversaire).
+  const sent=duels.filter(d=>d.status==="pending"&&d.challenger===me);
   const sentHtml=sent.map(d=>{
-    const left=duelLeft(d.created_at);
     return `<div class="duelrow">
       <span class="dtxt">Tu défies <b>${escAttr(pseudoById(d.opponent))}</b> · <b>${d.stake} pts</b><br>
-        <span class="dwait">En attente de sa réponse… forfait en ta faveur dans <b>${left}</b></span></span>
+        <span class="dwait">En attente de sa réponse…</span></span>
     </div>`;
   }).join("");
 
-  // HISTORIQUE = duels terminés + duels expirés (forfait), me concernant.
-  const hist=duels.filter(d=>(d.status==="done"||duelExpired(d))&&(d.challenger===me||d.opponent===me))
+  // HISTORIQUE = duels TERMINÉS me concernant.
+  const hist=duels.filter(d=>d.status==="done"&&(d.challenger===me||d.opponent===me))
     .sort((a,b)=>String(b.resolved_at||b.created_at||"").localeCompare(String(a.resolved_at||a.created_at||""))).slice(0,14);
   const histHtml=hist.map(d=>{
     const iAmA=d.challenger===me;
     const other=pseudoById(iAmA?d.opponent:d.challenger);
-    // FORFAIT (pas de réponse sous 24 h) : le provocateur gagne.
-    if(d.status!=="done"){
-      const iWon=iAmA;
-      const badge=iWon?`<span class="ptsbadge g3">+${d.stake}</span>`
-        :`<span class="ptsbadge g0" style="color:var(--red);border-color:var(--red)">−${d.stake}</span>`;
-      const txt=iWon?`Tu gagnes par <b>forfait</b> contre <b>${escAttr(other)}</b> <span class="dwait">(pas répondu à temps)</span>`
-        :`<b>Forfait</b> contre <b>${escAttr(other)}</b> <span class="dwait">(tu n'as pas répondu à temps)</span>`;
-      return `<div class="duelrow ${iWon?"win":"lose"}"><span class="dtxt">🏳️ ${txt}</span>${badge}</div>`;
-    }
     const myMv=iAmA?d.move_a:d.move_b, opMv=iAmA?d.move_b:d.move_a;
     const iWon=(d.result==="a"&&iAmA)||(d.result==="b"&&!iAmA);
     const tie=d.result==="tie";
@@ -2324,7 +2292,6 @@ function renderDuels(){
     <div class="duelbox" style="margin-top:0">
       <h4>⚔️ Duels de l'Aigle</h4>
       <p class="dsub">Pierre-feuille-ciseaux entre joueurs. Choisis un adversaire, ta mise et ton coup — le gagnant rafle la mise. Ton coup reste secret jusqu'à sa réponse.</p>
-      <p class="duelrule">⏱️ <b>Réponse obligatoire sous 24 h.</b> Passé ce délai, le défi est <b>perdu par forfait</b> : les points vont au joueur qui a lancé le défi.</p>
       ${form}
       ${group(`Défis reçus (${received.length})`,recHtml)}
       ${group("Défis envoyés (en attente)",sentHtml)}
@@ -2361,15 +2328,14 @@ async function respondDuel(id,move){
 }
 
 /* ---- ALERTE "on t'a lancé un défi" : bannière géante + badge, sur toutes les pages ---- */
-// Récupère les défis EN ATTENTE qui me sont adressés (non expirés) via une requête légère,
+// Récupère TOUS les défis en attente qui me sont adressés via une requête légère,
 // indépendante du classement, pour que l'alerte s'affiche quel que soit l'onglet.
 async function refreshDuelAlert(){
   if(!supabase||!state.user){ state.duelAlert=[]; paintDuelAlert(); return; }
   try{
     const {data}=await supabase.from("duels_pub")
       .select("id,challenger,stake,status,created_at").eq("opponent",state.user.id).eq("status","pending");
-    const now=Date.now();
-    const live=(data||[]).filter(d=>d.created_at && (now-new Date(d.created_at).getTime())<=DUEL_DEADLINE_MS);
+    const live=(data||[]);
     // Pseudos des provocateurs → pour nommer l'alerte sur toutes les pages (même sans lbCache).
     let names={};
     const ids=[...new Set(live.map(d=>d.challenger))];
@@ -2390,16 +2356,15 @@ function paintDuelAlert(){
   if(!box)return;
   if(!list.length){ box.classList.remove("on"); box.innerHTML=""; return; }
   const n=list.length;
-  // nom du provocateur (via lbCache si dispo) + plus petit temps restant
+  // nom du provocateur (via lbCache si dispo)
   const nameOf=d=>{ if(d.challengerName)return d.challengerName; const p=(lbCache&&lbCache.profiles||[]).find(x=>x.id===d.challenger); return p?(p.pseudo||"un joueur"):"un joueur"; };
   const who = n===1 ? `<b>${escAttr(nameOf(list[0]))}</b> t'a lancé un défi ⚔️`
                     : `<b>${n} joueurs</b> t'ont lancé un défi ⚔️`;
-  const soonest=list.map(d=>duelLeft(d.created_at)).filter(Boolean)[0];
   const stakeTxt = n===1 ? ` · ${list[0].stake} pts en jeu` : "";
   box.innerHTML=`<span class="da-ic">⚔️</span>
     <div class="da-txt">
       <div class="da-h">${who}</div>
-      <div class="da-s">Réponds vite au pierre-feuille-ciseaux${stakeTxt} — ${soonest?`il te reste <b>${soonest}</b>, `:""}sinon tu perds par <b>forfait</b> !</div>
+      <div class="da-s">Réponds au pierre-feuille-ciseaux${stakeTxt} pour rafler la mise !</div>
     </div>
     <button class="da-btn" onclick="gotoDuels()">Répondre maintenant →</button>`;
   box.classList.add("on");
@@ -2509,16 +2474,16 @@ function renderRival(){
     </div>`;
   }
 
-  // ---- Ses duels de l'Aigle (pierre-feuille-ciseaux) : terminés + forfaits, PUBLIC ----
+  // ---- Ses duels de l'Aigle (pierre-feuille-ciseaux) : terminés, PUBLIC ----
   const duelPanel=renderRivalDuels(id, me);
 
   view.innerHTML=back+hero+tourPanel+body+duelPanel;
 }
 
 // Panneau "duels de l'Aigle" d'un joueur — consultable par tous (dans sa fiche).
-// N'affiche que les duels TERMINÉS ou perdus par FORFAIT (jamais les défis en cours).
+// N'affiche que les duels TERMINÉS (jamais les défis en cours).
 function renderRivalDuels(id, me){
-  const list=(lbCache.duels||[]).filter(d=>(d.challenger===id||d.opponent===id)&&(d.status==="done"||duelExpired(d)))
+  const list=(lbCache.duels||[]).filter(d=>(d.challenger===id||d.opponent===id)&&d.status==="done")
     .sort((a,b)=>String(b.resolved_at||b.created_at||"").localeCompare(String(a.resolved_at||a.created_at||"")));
   if(!list.length){
     return `<div class="panel" style="margin-top:12px">
@@ -2530,20 +2495,18 @@ function renderRivalDuels(id, me){
   const rowsHtml=list.map(d=>{
     const isA=d.challenger===id;                         // ce joueur est-il le provocateur ?
     const other=pseudoById(isA?d.opponent:d.challenger);
-    const forfeit=d.status!=="done";
-    let cls,badge,txt,moves="";
-    if(!forfeit && d.result==="tie"){
+    const moves=` <span class="dwait">(${emo(isA?d.move_a:d.move_b)} vs ${emo(isA?d.move_b:d.move_a)})</span>`;
+    let cls,badge,txt;
+    if(d.result==="tie"){
       t++; cls=""; badge=`<span class="ptsbadge g0">nul · 0</span>`; txt=`Nul contre <b>${escAttr(other)}</b>`;
-      moves=` <span class="dwait">(${emo(isA?d.move_a:d.move_b)} vs ${emo(isA?d.move_b:d.move_a)})</span>`;
     }else{
-      const won=forfeit?isA:((d.result==="a"&&isA)||(d.result==="b"&&!isA));
-      if(!forfeit)moves=` <span class="dwait">(${emo(isA?d.move_a:d.move_b)} vs ${emo(isA?d.move_b:d.move_a)})</span>`;
+      const won=(d.result==="a"&&isA)||(d.result==="b"&&!isA);
       if(won){ w++; net+=d.stake; cls="win"; badge=`<span class="ptsbadge g3">+${d.stake}</span>`;
-        txt=forfeit?`Gagne par <b>forfait</b> contre <b>${escAttr(other)}</b>`:`Bat <b>${escAttr(other)}</b>`; }
+        txt=`Bat <b>${escAttr(other)}</b>`; }
       else{ l++; net-=d.stake; cls="lose"; badge=`<span class="ptsbadge g0" style="color:var(--red);border-color:var(--red)">−${d.stake}</span>`;
-        txt=forfeit?`<b>Forfait</b> contre <b>${escAttr(other)}</b> <span class="dwait">(pas répondu à temps)</span>`:`Battu par <b>${escAttr(other)}</b>`; }
+        txt=`Battu par <b>${escAttr(other)}</b>`; }
     }
-    return `<div class="duelrow ${cls}"><span class="dtxt">${forfeit?"🏳️ ":"⚔️ "}${txt}${moves}</span>${badge}</div>`;
+    return `<div class="duelrow ${cls}"><span class="dtxt">⚔️ ${txt}${moves}</span>${badge}</div>`;
   }).join("");
   const s=n=>n>1?"s":"";
   const bilan=`${w} gagné${s(w)} · ${l} perdu${s(l)} · ${t} nul${s(t)} · solde <b style="color:${net>=0?'#34c77b':'var(--red)'}">${net>=0?"+":""}${net} pts</b>`;
@@ -3644,7 +3607,6 @@ function maybeShowDuelIntro(){
       <li><b>🎯 Défie qui tu veux</b> — choisis n'importe quel joueur de la bande.</li>
       <li><b>💰 Mise au choix</b> — 10, 20 ou 30 points en jeu.</li>
       <li><b>🤫 Coup secret</b> — ton choix reste caché tant que l'autre n'a pas répondu, la résolution est faite côté serveur : zéro triche possible.</li>
-      <li><b>⏱️ 24 h pour répondre</b> — réponse obligatoire ! Passé 24 h, c'est <b>forfait</b> : les points vont à celui qui a lancé le défi.</li>
       <li><b>⚖️ Somme nulle</b> — le gagnant prend la mise au perdant, égalité = 0. De quoi <b>renverser le classement</b> sur un coup de bluff !</li>
     </ul>
     <p class="msub" style="margin:0 0 18px">👉 Ça se passe dans l'onglet <b>🏆 Classement</b>, tout en bas.</p>
