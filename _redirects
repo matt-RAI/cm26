@@ -1,6 +1,0 @@
-# Le dashboard est une vue de la single-page. Le rewrite "200" vers index.html
-# n'est pas fiable sur cette config Cloudflare (il finissait redirigé vers /).
-# On redirige donc /dashboard et /admin vers la racine avec le paramètre ?admin,
-# que le JS détecte au chargement (méthode robuste, sans dépendre du routing).
-/dashboard  /?admin  302
-/admin      /?admin  302

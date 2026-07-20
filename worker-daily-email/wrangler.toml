@@ -18,9 +18,12 @@ name = "cm26-daily-email"
 main = "src/index.js"
 compatibility_date = "2026-06-01"
 
-# Cron : 5h00 UTC chaque jour = 7h00 Paris en heure d'été (le Mondial est en juin/juillet).
+# ARCHIVÉ (juillet 2026) — le Mondial est terminé, le site est fermé.
+# Le Worker a été SUPPRIMÉ de Cloudflare (`wrangler delete`). Le cron est
+# neutralisé ici pour qu'un `wrangler deploy` accidentel ne relance pas les
+# envois d'e-mails. Pour réactiver un jour : remettre crons = ["0 5 * * *"].
 [triggers]
-crons = ["0 5 * * *"]
+crons = []
 
 # Variables NON secrètes (publiques). Les SECRETS se mettent via `wrangler secret put`,
 # JAMAIS ici (ce fichier est versionné sur GitHub).
